@@ -1,39 +1,65 @@
 // src/app/api/run-analysis/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { generateDailySummary } from '@/lib/analysis';
+import { generateDailySummary, generateMonthlySummary } from '@/lib/analysis';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify API key (you should set this in your environment variables)
+    // Verify API key
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.ANALYSIS_API_KEY}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Generate summary
-    const analysis = await generateDailySummary();
+    // Get the current date
+    const now = new Date();
+    const isLastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() === now.getDate();
 
-    // Save analysis to database
-    const { error: dbError } = await supabase
+    // Always run daily analysis
+    const dailyAnalysis = await generateDailySummary();
+
+    // Save daily analysis
+    const { error: dailyError } = await supabase
       .from('daily_summaries')
       .insert({
-        date: new Date().toISOString().split('T')[0],
-        nps_average: analysis.npsAverage,
-        positive_themes: analysis.positiveThemes,
-        negative_themes: analysis.negativeThemes,
-        summary: analysis.summary
+        date: now.toISOString().split('T')[0],
+        nps_average: dailyAnalysis.npsAverage,
+        positive_themes: dailyAnalysis.positiveThemes,
+        negative_themes: dailyAnalysis.negativeThemes,
+        summary: dailyAnalysis.summary
       });
 
-    if (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to save analysis' },
-        { status: 500 }
-      );
+    if (dailyError) {
+      console.error('Daily analysis error:', dailyError);
     }
 
-    return NextResponse.json(analysis);
+    // Run monthly analysis on the last day of the month
+    if (isLastDayOfMonth) {
+      const monthlyAnalysis = await generateMonthlySummary();
+      
+      const { error: monthlyError } = await supabase
+        .from('monthly_summaries')
+        .insert({
+          year_month: monthlyAnalysis.yearMonth,
+          nps_average: monthlyAnalysis.npsAverage,
+          nps_trend: monthlyAnalysis.npsTrend,
+          total_responses: monthlyAnalysis.totalResponses,
+          positive_themes: monthlyAnalysis.positiveThemes,
+          negative_themes: monthlyAnalysis.negativeThemes,
+          summary: monthlyAnalysis.summary
+        });
+
+      if (monthlyError) {
+        console.error('Monthly analysis error:', monthlyError);
+      }
+
+      return NextResponse.json({
+        daily: dailyAnalysis,
+        monthly: monthlyAnalysis
+      });
+    }
+
+    return NextResponse.json({ daily: dailyAnalysis });
   } catch (error) {
     console.error('Error running analysis:', error);
     return NextResponse.json(

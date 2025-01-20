@@ -8,16 +8,20 @@
     "start": "next start"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.731.1",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
+    "@supabase/supabase-js": "^2.48.0",
     "@tailwindcss/forms": "^0.5.10",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "lucide-react": "^0.263.1",
     "next": "14.1.0",
+    "openai": "^4.79.1",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "uuid": "^11.0.5"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
