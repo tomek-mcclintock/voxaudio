@@ -28,29 +28,49 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/api/dashboard');
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard data');
-        }
-        const result = await response.json();
-        if (result.error) {
-          throw new Error(result.error);
-        }
-        setData(result);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
+    fetchDashboardData();
   }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const response = await fetch('/api/dashboard');
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      setData(result);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runAnalysis = async () => {
+    try {
+      setAnalysisRunning(true);
+      const response = await fetch('/api/run-analysis', {
+        method: 'POST'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to run analysis');
+      }
+      await fetchDashboardData();
+      alert('Analysis complete! The dashboard has been updated.');
+    } catch (error) {
+      console.error('Error running analysis:', error);
+      alert('Failed to run analysis. Check console for details.');
+    } finally {
+      setAnalysisRunning(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -85,7 +105,20 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Ruggable Feedback Dashboard</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Ruggable Feedback Dashboard</h1>
+        <button
+          onClick={runAnalysis}
+          disabled={analysisRunning}
+          className={`${
+            analysisRunning 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-blue-500 hover:bg-blue-600'
+          } text-white font-semibold py-2 px-4 rounded transition-colors`}
+        >
+          {analysisRunning ? 'Running Analysis...' : 'Run Daily Analysis'}
+        </button>
+      </div>
       
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -115,7 +148,14 @@ export default function DashboardPage() {
               <XAxis dataKey="date" />
               <YAxis domain={[0, 10]} />
               <Tooltip />
-              <Line type="monotone" dataKey="nps" stroke="#2563eb" strokeWidth={2} />
+              <Line 
+                type="monotone" 
+                dataKey="nps" 
+                stroke="#2563eb" 
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -123,7 +163,9 @@ export default function DashboardPage() {
 
       {/* Latest Feedback */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Latest Feedback</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Latest Feedback</h2>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead>
@@ -136,12 +178,22 @@ export default function DashboardPage() {
             </thead>
             <tbody>
               {recentFeedback.map((feedback) => (
-                <tr key={feedback.order_id} className="border-b">
+                <tr key={feedback.order_id} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4">
                     {new Date(feedback.created_at).toLocaleDateString()}
                   </td>
                   <td className="py-3 px-4">{feedback.order_id}</td>
-                  <td className="py-3 px-4">{feedback.nps_score}</td>
+                  <td className="py-3 px-4">
+                    <span 
+                      className={`px-2 py-1 rounded ${
+                        feedback.nps_score >= 9 ? 'bg-green-100 text-green-800' :
+                        feedback.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {feedback.nps_score}
+                    </span>
+                  </td>
                   <td className="py-3 px-4">
                     {feedback.transcription ? (
                       <span>{feedback.transcription.slice(0, 100)}...</span>
@@ -184,7 +236,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-4">
             <h3 className="font-semibold mb-2">Summary</h3>
-            <p className="text-gray-700">{dailySummaries[0].summary}</p>
+            <p className="text-gray-700 whitespace-pre-line">{dailySummaries[0].summary}</p>
           </div>
         </div>
       )}
