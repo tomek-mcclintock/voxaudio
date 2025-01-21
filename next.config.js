@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true
+  reactStrictMode: true,
+  experimental: {
+    serverActions: true,
+  },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
+  output: 'standalone'
 }
-
-module.exports = nextConfig
