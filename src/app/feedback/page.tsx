@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import FeedbackForm from '@/components/FeedbackForm';
-import Header from '@/components/header';
+import Header from '@/components/Header';
 
 export default function FeedbackPage({
   searchParams,
