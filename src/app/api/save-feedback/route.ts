@@ -1,18 +1,23 @@
-export const runtime = 'nodejs';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { uploadVoiceRecording } from '@/lib/s3';
 import { transcribeAudio, analyzeFeedback } from '@/lib/openai';
 
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
+    console.log('Starting feedback submission...');
+    
     const formData = await request.formData();
     const orderId = formData.get('orderId') as string;
     const npsScore = parseInt(formData.get('npsScore') as string);
     const audioFile = formData.get('audio') as Blob | null;
 
+    console.log('Received data:', { orderId, npsScore, hasAudio: !!audioFile });
+
     if (!orderId || !npsScore) {
+      console.log('Missing required fields');
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -24,18 +29,35 @@ export async function POST(request: NextRequest) {
     let sentiment = null;
 
     if (audioFile) {
-      const arrayBuffer = await audioFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      try {
+        console.log('Processing audio file...');
+        const arrayBuffer = await audioFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
 
-      voiceFileUrl = await uploadVoiceRecording(buffer, orderId);
-      transcription = await transcribeAudio(buffer);
+        console.log('Uploading to S3...');
+        voiceFileUrl = await uploadVoiceRecording(buffer, orderId);
+        console.log('S3 upload complete:', voiceFileUrl);
 
-      if (transcription) {
-        const analysis = await analyzeFeedback(transcription);
-        sentiment = analysis.sentiment;
+        console.log('Transcribing audio...');
+        transcription = await transcribeAudio(buffer);
+        console.log('Transcription complete:', transcription);
+
+        if (transcription) {
+          console.log('Analyzing feedback...');
+          const analysis = await analyzeFeedback(transcription);
+          sentiment = analysis.sentiment;
+          console.log('Analysis complete:', sentiment);
+        }
+      } catch (error) {
+        console.error('Error processing audio:', error);
+        return NextResponse.json(
+          { error: 'Failed to process audio' },
+          { status: 500 }
+        );
       }
     }
 
+    console.log('Saving to database...');
     const { error: dbError } = await supabase
       .from('feedback_submissions')
       .insert({
@@ -55,6 +77,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('Feedback submission complete');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error processing feedback:', error);
