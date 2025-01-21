@@ -29,16 +29,28 @@ export async function analyzeFeedback(text: string): Promise<{
     messages: [
       {
         role: "system",
-        content: "You are analyzing customer feedback for Ruggable UK. Provide a sentiment (positive/negative/neutral), a brief summary, and key themes identified."
+        content: "You are analyzing customer feedback for Ruggable UK. You will respond with JSON containing a 'sentiment' (positive/negative/neutral), a brief 'summary', and key 'themes' identified as an array."
       },
       {
         role: "user",
         content: text
       }
-    ],
-    response_format: { type: "json_object" }
+    ]
   });
 
-  const analysis = JSON.parse(response.choices[0].message.content || '{}');
-  return analysis;
+  try {
+    // Parse the response from the text format
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error('No content in response');
+    }
+    return JSON.parse(content);
+  } catch (error) {
+    // If parsing fails, return a structured response
+    return {
+      sentiment: 'neutral',
+      summary: response.choices[0].message.content || 'No summary available',
+      themes: []
+    };
+  }
 }
