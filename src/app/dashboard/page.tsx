@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DailySummary {
@@ -82,6 +83,42 @@ export default function DashboardPage() {
     }
   };
 
+  const exportToExcel = () => {
+    if (!data) return;
+
+    const { recentFeedback, dailySummaries } = data;
+
+    // Prepare feedback data
+    const feedbackData = recentFeedback.map(feedback => ({
+      'Date': new Date(feedback.created_at).toLocaleDateString(),
+      'Order ID': feedback.order_id,
+      'NPS Score': feedback.nps_score,
+      'Has Voice Recording': feedback.voice_file_url ? 'Yes' : 'No',
+      'Transcription': feedback.transcription || 'No transcription',
+    }));
+
+    // Prepare summaries data
+    const summariesData = dailySummaries.map(summary => ({
+      'Date': new Date(summary.date).toLocaleDateString(),
+      'NPS Average': summary.nps_average,
+      'Positive Themes': summary.positive_themes?.join(', ') || '',
+      'Negative Themes': summary.negative_themes?.join(', ') || '',
+      'Summary': summary.summary
+    }));
+
+    // Create workbook and add worksheets
+    const wb = XLSX.utils.book_new();
+    
+    const feedbackSheet = XLSX.utils.json_to_sheet(feedbackData);
+    XLSX.utils.book_append_sheet(wb, feedbackSheet, "Feedback");
+    
+    const summariesSheet = XLSX.utils.json_to_sheet(summariesData);
+    XLSX.utils.book_append_sheet(wb, summariesSheet, "Daily Summaries");
+
+    // Generate Excel file
+    XLSX.writeFile(wb, `ruggable-feedback-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -117,17 +154,25 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Ruggable Feedback Dashboard</h1>
-        <button
-          onClick={runAnalysis}
-          disabled={analysisRunning}
-          className={`${
-            analysisRunning 
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : 'bg-blue-500 hover:bg-blue-600'
-          } text-white font-semibold py-2 px-4 rounded transition-colors`}
-        >
-          {analysisRunning ? 'Running Analysis...' : 'Run Daily Analysis'}
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={exportToExcel}
+            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded transition-colors"
+          >
+            Export to Excel
+          </button>
+          <button
+            onClick={runAnalysis}
+            disabled={analysisRunning}
+            className={`${
+              analysisRunning 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            } text-white font-semibold py-2 px-4 rounded transition-colors`}
+          >
+            {analysisRunning ? 'Running Analysis...' : 'Run Daily Analysis'}
+          </button>
+        </div>
       </div>
       
       {/* Stats Overview */}
@@ -206,7 +251,7 @@ export default function DashboardPage() {
                   </td>
                   <td className="py-3 px-4">
                     {feedback.transcription ? (
-                      <span>{feedback.transcription.slice(0, 100)}...</span>
+                      <span>{feedback.transcription.slice(0, 100)}{feedback.transcription.length > 100 ? '...' : ''}</span>
                     ) : (
                       feedback.voice_file_url ? (
                         <span className="text-blue-600">Has voice recording</span>
