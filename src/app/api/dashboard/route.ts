@@ -5,6 +5,8 @@ export const runtime = 'nodejs';
 
 export async function GET() {
   try {
+    console.log('Fetching dashboard data...');
+    
     // Fetch last 30 days of summaries
     const { data: summaries, error: summariesError } = await supabase
       .from('daily_summaries')
@@ -12,7 +14,12 @@ export async function GET() {
       .order('date', { ascending: false })
       .limit(30);
 
-    if (summariesError) throw summariesError;
+    if (summariesError) {
+      console.error('Summaries error:', summariesError);
+      throw summariesError;
+    }
+
+    console.log('Fetched summaries:', summaries);
 
     // Fetch recent feedback entries
     const { data: feedback, error: feedbackError } = await supabase
@@ -21,7 +28,12 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    if (feedbackError) throw feedbackError;
+    if (feedbackError) {
+      console.error('Feedback error:', feedbackError);
+      throw feedbackError;
+    }
+
+    console.log('Fetched feedback:', feedback);
 
     return NextResponse.json({
       dailySummaries: summaries || [],

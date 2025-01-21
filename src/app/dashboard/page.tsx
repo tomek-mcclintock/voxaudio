@@ -30,17 +30,23 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [analysisRunning, setAnalysisRunning] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch('/api/dashboard');
+      const response = await fetch('/api/dashboard', {
+        // Add cache busting parameter
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        next: { revalidate: 0 }
+      });
+      
       if (!response.ok) {
         throw new Error('Failed to fetch dashboard data');
       }
       const result = await response.json();
+      console.log('Dashboard data:', result);
+      
       if (result.error) {
         throw new Error(result.error);
       }
@@ -52,6 +58,10 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const runAnalysis = async () => {
     try {
