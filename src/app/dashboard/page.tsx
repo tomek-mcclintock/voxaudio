@@ -33,13 +33,12 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch('/api/dashboard', {
-        // Add cache busting parameter
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/dashboard?t=${timestamp}`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
-        },
-        next: { revalidate: 0 }
+        }
       });
       
       if (!response.ok) {
@@ -62,7 +61,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Set up auto-refresh every 30 seconds
+    const intervalId = setInterval(fetchDashboardData, 30000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
   }, []);
+
 
   const runAnalysis = async () => {
     try {

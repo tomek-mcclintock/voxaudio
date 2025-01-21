@@ -35,10 +35,18 @@ export async function GET() {
 
     console.log('Fetched feedback:', feedback);
 
+    // Add no-cache headers
+    const headers = {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
+    };
+
     return NextResponse.json({
       dailySummaries: summaries || [],
       recentFeedback: feedback || []
-    });
+    }, { headers });
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     return NextResponse.json(
