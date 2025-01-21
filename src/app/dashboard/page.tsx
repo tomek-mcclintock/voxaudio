@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { supabase } from '@/lib/supabase';
 
 interface DailySummary {
   date: string;
@@ -20,38 +19,31 @@ interface FeedbackEntry {
   voice_file_url: string | null;
 }
 
+interface DashboardData {
+  dailySummaries: DailySummary[];
+  recentFeedback: FeedbackEntry[];
+}
+
 export default function DashboardPage() {
-  const [dailySummaries, setDailySummaries] = useState<DailySummary[]>([]);
-  const [recentFeedback, setRecentFeedback] = useState<FeedbackEntry[]>([]);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch last 30 days of summaries
-        const { data: summaries, error: summariesError } = await supabase
-          .from('daily_summaries')
-          .select('*')
-          .order('date', { ascending: false })
-          .limit(30);
-
-        if (summariesError) throw summariesError;
-
-        // Fetch recent feedback entries
-        const { data: feedback, error: feedbackError } = await supabase
-          .from('feedback_submissions')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (feedbackError) throw feedbackError;
-
-        setDailySummaries(summaries || []);
-        setRecentFeedback(feedback || []);
+        const response = await fetch('/api/dashboard');
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard data');
+        }
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        setData(result);
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError('Failed to load dashboard data');
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
@@ -68,13 +60,15 @@ export default function DashboardPage() {
     );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg text-red-600">{error}</div>
+        <div className="text-lg text-red-600">{error || 'Failed to load data'}</div>
       </div>
     );
   }
+
+  const { dailySummaries, recentFeedback } = data;
 
   // Prepare data for NPS trend chart
   const chartData = dailySummaries
