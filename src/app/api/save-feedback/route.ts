@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { uploadVoiceRecording } from '@/lib/s3';
@@ -21,26 +23,19 @@ export async function POST(request: NextRequest) {
     let transcription = null;
     let sentiment = null;
 
-    // Handle audio if provided
     if (audioFile) {
-      // Convert Blob to Buffer for S3 upload
       const arrayBuffer = await audioFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // Upload to S3
       voiceFileUrl = await uploadVoiceRecording(buffer, orderId);
-
-      // Transcribe audio
       transcription = await transcribeAudio(buffer);
 
-      // Analyze feedback if we have transcription
       if (transcription) {
         const analysis = await analyzeFeedback(transcription);
         sentiment = analysis.sentiment;
       }
     }
 
-    // Save to database
     const { error: dbError } = await supabase
       .from('feedback_submissions')
       .insert({
