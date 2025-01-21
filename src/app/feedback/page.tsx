@@ -1,5 +1,3 @@
-export const runtime = 'nodejs';
-
 import { Suspense } from 'react';
 import FeedbackForm from '@/components/FeedbackForm';
 
@@ -26,7 +24,7 @@ export default function FeedbackPage({
       <Suspense
         fallback={
           <div className="flex justify-center items-center h-screen">
-            Loading...
+            <div className="text-gray-600">Loading...</div>
           </div>
         }
       >
