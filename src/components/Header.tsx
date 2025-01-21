@@ -4,15 +4,20 @@ export default function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              {/* Replace with actual Ruggable logo */}
               <img 
                 src="/ruggable-logo.svg" 
                 alt="Ruggable" 
                 className="h-8"
                 onError={(e) => {
+                  console.error('Logo failed to load');
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
-                }} 
+                  // Show text fallback
+                  const span = document.createElement('span');
+                  span.className = 'text-xl font-bold';
+                  span.textContent = 'Ruggable';
+                  target.parentNode?.appendChild(span);
+                }}
               />
             </div>
             <div className="flex items-center space-x-4">
