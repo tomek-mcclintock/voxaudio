@@ -1,4 +1,6 @@
 import OpenAI from 'openai';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
 if (!process.env.OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY')
 
@@ -7,12 +9,25 @@ const openai = new OpenAI({
 });
 
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
-  const response = await openai.audio.transcriptions.create({
-    file: audioBuffer,
-    model: "whisper-1",
-  });
+  // Create a temporary file
+  const tempFilePath = join('/tmp', `${Date.now()}.webm`);
+  writeFileSync(tempFilePath, audioBuffer);
 
-  return response.text;
+  try {
+    const response = await openai.audio.transcriptions.create({
+      file: await import('fs').then(fs => fs.createReadStream(tempFilePath)),
+      model: "whisper-1",
+    });
+
+    return response.text;
+  } finally {
+    // Clean up temporary file
+    try {
+      unlinkSync(tempFilePath);
+    } catch (error) {
+      console.error('Error cleaning up temp file:', error);
+    }
+  }
 }
 
 export async function analyzeFeedback(text: string): Promise<{
@@ -31,7 +46,8 @@ export async function analyzeFeedback(text: string): Promise<{
         role: "user",
         content: text
       }
-    ]
+    ],
+    response_format: { type: "json_object" }
   });
 
   const analysis = JSON.parse(response.choices[0].message.content || '{}');
