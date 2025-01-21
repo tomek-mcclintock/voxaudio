@@ -11,21 +11,19 @@ export async function generateDailySummary() {
   try {
     console.log('Starting daily summary generation...');
     
-    // Get yesterday's date
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    
+    // Get today's date range
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Fetch yesterday's feedback
+    // Fetch today's feedback
     console.log('Fetching feedback...');
     const { data: feedbackEntries, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .select('*')
-      .gte('created_at', yesterday.toISOString())
-      .lt('created_at', today.toISOString());
+      .gte('created_at', today.toISOString())
+      .lt('created_at', tomorrow.toISOString());
 
     if (feedbackError) {
       console.error('Error fetching feedback:', feedbackError);
@@ -49,7 +47,7 @@ export async function generateDailySummary() {
     // Compile all transcriptions
     const transcriptions = feedbackEntries
       .filter(entry => entry.transcription)
-      .map(entry => entry.transcription)
+      .map(entry => `Feedback (NPS Score ${entry.nps_score}): ${entry.transcription}`)
       .join('\n\n');
 
     if (!transcriptions) {
@@ -68,28 +66,24 @@ export async function generateDailySummary() {
       messages: [
         {
           role: "system",
-          content: "You are analyzing customer feedback for Ruggable UK. You will provide a JSON response containing positive themes, negative themes, and a summary."
+          content: "You are analyzing customer feedback for Ruggable UK. Analyze the feedback and provide a response in this exact JSON format: {\"positiveThemes\": [\"theme1\", \"theme2\"], \"negativeThemes\": [\"theme1\", \"theme2\"], \"summary\": \"overall summary\"}"
         },
         {
           role: "user",
-          content: `Analyze the following feedback and provide:
-          - A list of key positive themes
-          - A list of key negative themes
-          - A concise summary of the main points
-          
-          Feedback transcriptions:
-          ${transcriptions}`
+          content: `Analyze these customer feedback entries and identify key themes and patterns. Here are the feedbacks:\n\n${transcriptions}`
         }
       ]
     });
 
     // Parse the analysis
     const analysisText = response.choices[0].message.content;
+    console.log('GPT Analysis:', analysisText);
+    
     let analysis;
     try {
       analysis = JSON.parse(analysisText || '{}');
     } catch (e) {
-      console.log('Error parsing GPT response, using formatted version');
+      console.error('Error parsing GPT response:', e);
       // If JSON parsing fails, create a structured response from the text
       analysis = {
         positiveThemes: [],
