@@ -2,12 +2,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
  
 export function middleware(request: NextRequest) {
-  // Return response
   return NextResponse.next()
 }
  
 export const config = {
-  runtime: 'nodejs',
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
