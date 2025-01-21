@@ -24,7 +24,7 @@ export default function FeedbackPage({
       <Suspense
         fallback={
           <div className="flex justify-center items-center h-screen">
-            <div className="text-gray-600">Loading...</div>
+            Loading...
           </div>
         }
       >
