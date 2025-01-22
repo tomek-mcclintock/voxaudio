@@ -1,52 +1,60 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// Tell Next.js this is a dynamic route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    console.log('Fetching dashboard data...');
+    // Get current timestamp for the query
+    const now = new Date().toISOString();
     
-    // Fetch last 30 days of summaries
+    console.log('Fetching dashboard data at:', now);
+    
+    // Fetch last 30 days of summaries with timestamp filter
     const { data: summaries, error: summariesError } = await supabase
       .from('daily_summaries')
       .select('*')
       .order('date', { ascending: false })
-      .limit(30);
+      .limit(30)
+      .lte('created_at', now); // Only get entries up to now
 
     if (summariesError) {
       console.error('Summaries error:', summariesError);
       throw summariesError;
     }
 
-    console.log('Fetched summaries:', summaries);
-
-    // Fetch recent feedback entries
+    // Fetch recent feedback with timestamp filter
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(10)
+      .lte('created_at', now); // Only get entries up to now
 
     if (feedbackError) {
       console.error('Feedback error:', feedbackError);
       throw feedbackError;
     }
 
-    console.log('Fetched feedback:', feedback);
-
-    // Add no-cache headers
-    const headers = {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    // Add cache control headers
+    const headers = new Headers({
+      'Cache-Control': 'no-store, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',
-      'Surrogate-Control': 'no-store'
-    };
+    });
 
-    return NextResponse.json({
+    return new NextResponse(JSON.stringify({
+      timestamp: now,
       dailySummaries: summaries || [],
       recentFeedback: feedback || []
-    }, { headers });
+    }), {
+      headers,
+      status: 200,
+    });
+
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     return NextResponse.json(

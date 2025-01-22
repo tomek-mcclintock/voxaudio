@@ -34,23 +34,30 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     try {
       const timestamp = new Date().getTime();
-      const response = await fetch(`/api/dashboard?t=${timestamp}`, {
+      const response = await fetch(`/api/dashboard?timestamp=${timestamp}`, {
+        cache: 'no-store',
+        next: { revalidate: 0 },
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
         }
       });
       
       if (!response.ok) {
         throw new Error('Failed to fetch dashboard data');
       }
+
       const result = await response.json();
-      console.log('Dashboard data:', result);
+      console.log('Dashboard data fetched at:', new Date().toISOString(), result);
       
       if (result.error) {
         throw new Error(result.error);
       }
-      setData(result);
+
+      // Only update if we got new data
+      if (result.recentFeedback?.length || result.dailySummaries?.length) {
+        setData(result);
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
