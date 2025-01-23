@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import AudioRecorder from './AudioRecorder';
-import Link from 'next/link';
+import { Send } from 'lucide-react';
 
 interface FeedbackFormProps {
   orderId: string;
@@ -14,24 +14,17 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [consents, setConsents] = useState({
-    dataProcessing: false,
-    voiceRecording: false
-  });
+  const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [showPrivacyDetails, setShowPrivacyDetails] = useState(false);
 
   const handleSubmit = async () => {
+    if (!privacyConsent) {
+      setError('Please accept the privacy notice to continue');
+      return;
+    }
+
     if (!npsScore) {
       setError('Please provide a score');
-      return;
-    }
-
-    if (audioBlob && !consents.voiceRecording) {
-      setError('Please accept voice recording consent to submit voice feedback');
-      return;
-    }
-
-    if (!consents.dataProcessing) {
-      setError('Please accept data processing consent to submit feedback');
       return;
     }
 
@@ -66,38 +59,20 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Thank You!</h2>
-          <p className="text-gray-600 mb-4">Your feedback has been recorded and will help us improve our products and services.</p>
-          <a 
-            href="https://ruggable.co.uk" 
-            className="text-blue-500 hover:text-blue-600"
-          >
-            Return to Ruggable
-          </a>
-        </div>
+      <div className="text-center p-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Thank You!</h2>
+        <p className="text-gray-600">Your feedback has been recorded.</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-medium text-gray-500">Order ID: {orderId}</h2>
-          <div className="flex items-center">
-            <svg className="h-4 w-4 text-green-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="text-sm text-gray-500">Secure feedback</span>
-          </div>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-800">
-          Share Your Ruggable Experience
-        </h1>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">
+        Share Your Ruggable Experience
+      </h1>
 
+      {/* NPS Score Section */}
       <div className="mb-8">
         <p className="text-gray-600 mb-4">
           How likely are you to recommend Ruggable to friends and family?
@@ -130,57 +105,55 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
         </div>
       </div>
 
+      {/* Voice Recording Section */}
       <div className="mb-8">
         <p className="text-gray-600 mb-4">
           Tell us about your experience (max 5 minutes):
         </p>
-        <AudioRecorder onRecordingComplete={setAudioBlob} disabled={!consents.voiceRecording} />
+        <AudioRecorder onRecordingComplete={setAudioBlob} />
       </div>
 
-      {/* Consent Checkboxes */}
-      <div className="mb-6 space-y-4">
-        <div className="flex items-start">
-          <div className="flex items-center h-5">
-            <input
-              id="dataProcessing"
-              type="checkbox"
-              checked={consents.dataProcessing}
-              onChange={(e) => setConsents(prev => ({
-                ...prev,
-                dataProcessing: e.target.checked
-              }))}
-              className="h-4 w-4 text-blue-600 rounded border-gray-300"
-            />
-          </div>
-          <div className="ml-3">
-            <label htmlFor="dataProcessing" className="text-sm text-gray-600">
-              I consent to Ruggable processing my feedback data as described in the{' '}
-              <Link href="/privacy" className="text-blue-600 hover:underline" target="_blank">
-                Privacy Notice
-              </Link>
-            </label>
-          </div>
+      {/* Privacy Notice Section */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-start mb-4">
+          <input
+            type="checkbox"
+            id="privacyConsent"
+            checked={privacyConsent}
+            onChange={(e) => setPrivacyConsent(e.target.checked)}
+            className="mt-1 mr-2"
+          />
+          <label htmlFor="privacyConsent" className="text-sm text-gray-600">
+            I consent to the processing of my feedback, including voice recording, and understand that my data will be transferred to and processed in the United States.
+          </label>
         </div>
+        
+        <button
+          onClick={() => setShowPrivacyDetails(!showPrivacyDetails)}
+          className="text-blue-600 text-sm hover:underline focus:outline-none"
+        >
+          {showPrivacyDetails ? 'Hide Privacy Details' : 'View Privacy Details'}
+        </button>
 
-        <div className="flex items-start">
-          <div className="flex items-center h-5">
-            <input
-              id="voiceRecording"
-              type="checkbox"
-              checked={consents.voiceRecording}
-              onChange={(e) => setConsents(prev => ({
-                ...prev,
-                voiceRecording: e.target.checked
-              }))}
-              className="h-4 w-4 text-blue-600 rounded border-gray-300"
-            />
+        {showPrivacyDetails && (
+          <div className="mt-2 text-sm text-gray-600 bg-white p-3 rounded">
+            <h3 className="font-semibold mb-2">Privacy Notice</h3>
+            <p className="mb-2">We collect and process your feedback, including:</p>
+            <ul className="list-disc pl-5 mb-2">
+              <li>Your NPS score</li>
+              <li>Voice recordings (if provided)</li>
+              <li>Order ID</li>
+            </ul>
+            <p className="mb-2">Your data will be:</p>
+            <ul className="list-disc pl-5 mb-2">
+              <li>Transferred to and processed in the United States</li>
+              <li>Used to improve our products and services</li>
+              <li>Processed using AI services for transcription and analysis</li>
+              <li>Stored securely and retained according to our retention policy</li>
+            </ul>
+            <p>For more information about how we process your data, please see our full <a href="https://ruggable.co.uk/policies/privacy-policy" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.</p>
           </div>
-          <div className="ml-3">
-            <label htmlFor="voiceRecording" className="text-sm text-gray-600">
-              I consent to Ruggable recording and processing my voice feedback
-            </label>
-          </div>
-        </div>
+        )}
       </div>
 
       {error && (
@@ -191,20 +164,14 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
 
       <button
         onClick={handleSubmit}
-        disabled={isSubmitting || (!npsScore && !audioBlob) || !consents.dataProcessing}
+        disabled={isSubmitting || !privacyConsent || (!npsScore && !audioBlob)}
         className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 
                  disabled:cursor-not-allowed text-white font-semibold py-3 
                  px-4 rounded-lg flex items-center justify-center gap-2"
       >
+        <Send className="w-5 h-5" />
         {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
       </button>
-
-      <p className="mt-4 text-sm text-gray-500 text-center">
-        By submitting, you agree to our{' '}
-        <Link href="/privacy" className="text-blue-600 hover:underline" target="_blank">
-          Privacy Notice
-        </Link>
-      </p>
     </div>
   );
 };
