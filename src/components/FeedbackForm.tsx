@@ -127,9 +127,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
             className="mt-1"
           />
           <span className="text-sm text-gray-600">
-            I consent to Ruggable collecting and processing my voice recording and feedback. 
-            I understand this data will be used to improve products and services.
-          </span>
+          I consent to Ruggable collecting and processing my voice recording and feedback, including processing on US-based servers. 
+          I understand this data will be used to improve products and services. View our full <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.          </span>
         </label>
       </div>
 
