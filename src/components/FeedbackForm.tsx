@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import AudioRecorder from './AudioRecorder';
+import AudioRecorder, { AudioRecorderRef } from './AudioRecorder';
 
 interface FeedbackFormProps {
   orderId: string;
@@ -14,7 +14,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
-  const audioRecorderRef = useRef<{ stopRecording: () => void } | null>(null);
+  const audioRecorderRef = useRef<AudioRecorderRef>(null);
 
   const handleSubmit = async () => {
     if (!consent) {
@@ -33,7 +33,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
     try {
       // Stop recording if active
       if (audioRecorderRef.current) {
-        await audioRecorderRef.current.stopRecording();
+        audioRecorderRef.current.stopRecording();
       }
 
       const formData = new FormData();

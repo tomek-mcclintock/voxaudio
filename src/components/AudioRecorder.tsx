@@ -1,155 +1,159 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import AudioRecorder from './AudioRecorder';
+import React, { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Mic, Square, Pause, Play } from 'lucide-react';
 
-interface FeedbackFormProps {
-  orderId: string;
+export interface AudioRecorderRef {
+  stopRecording: () => void;
 }
 
-const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
-  const [npsScore, setNpsScore] = useState<number | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [consent, setConsent] = useState(false);
-  const audioRecorderRef = useRef<{ stopRecording: () => void } | null>(null);
+interface AudioRecorderProps {
+  onRecordingComplete: (audioBlob: Blob | null) => void;
+}
 
-  const handleSubmit = async () => {
-    if (!consent) {
-      setError('Please accept the consent notice to submit feedback');
-      return;
-    }
-    
-    if (!npsScore) {
-      setError('Please provide a score');
-      return;
-    }
+const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
+  ({ onRecordingComplete }, ref) => {
+    const [isRecording, setIsRecording] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+    const timerRef = useRef<NodeJS.Timeout>();
+    const streamRef = useRef<MediaStream | null>(null);
 
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      // Stop recording if active
-      if (audioRecorderRef.current) {
-        await audioRecorderRef.current.stopRecording();
+    useImperativeHandle(ref, () => ({
+      stopRecording: () => {
+        if (mediaRecorderRef.current && isRecording) {
+          handleStopRecording();
+        }
       }
+    }));
 
-      const formData = new FormData();
-      if (audioBlob) {
-        formData.append('audio', audioBlob);
+    const handleStopRecording = () => {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+        setIsPaused(false);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
       }
-      formData.append('orderId', orderId);
-      formData.append('npsScore', npsScore.toString());
+    };
 
-      const response = await fetch('/api/save-feedback', {
-        method: 'POST',
-        body: formData,
-      });
+    const startRecording = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        chunksRef.current = [];
 
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            chunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          onRecordingComplete(audioBlob);
+          setRecordingTime(0);
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+        setIsPaused(false);
+        
+        timerRef.current = setInterval(() => {
+          setRecordingTime(prev => {
+            if (prev >= 300) { // 5 minutes limit
+              handleStopRecording();
+              return prev;
+            }
+            return prev + 1;
+          });
+        }, 1000);
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
       }
+    };
 
-      setSubmitted(true);
-    } catch (err) {
-      setError('Failed to submit feedback. Please try again.');
-      console.error('Submission error:', err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    const togglePause = () => {
+      if (mediaRecorderRef.current) {
+        if (isPaused) {
+          mediaRecorderRef.current.resume();
+          setIsPaused(false);
+          timerRef.current = setInterval(() => {
+            setRecordingTime(prev => prev + 1);
+          }, 1000);
+        } else {
+          mediaRecorderRef.current.pause();
+          setIsPaused(true);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+          }
+        }
+      }
+    };
 
-  if (submitted) {
+    const formatTime = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     return (
-      <div className="text-center p-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Thank You!</h2>
-        <p className="text-gray-600">Your feedback has been recorded.</p>
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex gap-4">
+          {!isRecording ? (
+            <button
+              onClick={startRecording}
+              className="p-4 rounded-full bg-blue-500 hover:bg-blue-600 transition-colors"
+              aria-label="Start recording"
+            >
+              <Mic className="w-8 h-8 text-white" />
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={togglePause}
+                className="p-4 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors"
+                aria-label={isPaused ? "Resume recording" : "Pause recording"}
+              >
+                {isPaused ? (
+                  <Play className="w-8 h-8 text-white" />
+                ) : (
+                  <Pause className="w-8 h-8 text-white" />
+                )}
+              </button>
+              <button
+                onClick={handleStopRecording}
+                className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
+                aria-label="Stop recording"
+              >
+                <Square className="w-8 h-8 text-white" />
+              </button>
+            </>
+          )}
+        </div>
+        {(isRecording || recordingTime > 0) && (
+          <div className="text-sm text-gray-600">
+            {isRecording ? (
+              isPaused ? "Paused: " : "Recording: "
+            ) : (
+              "Recorded: "
+            )}
+            {formatTime(recordingTime)}
+          </div>
+        )}
       </div>
     );
   }
+);
 
-  return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">
-        Share Your Ruggable Experience
-      </h1>
+AudioRecorder.displayName = 'AudioRecorder';
 
-      <div className="mb-8">
-        <p className="text-gray-600 mb-4">
-          How likely are you to recommend Ruggable to friends and family?
-        </p>
-        <div className="flex justify-between gap-1">
-          {[...Array(10)].map((_, i) => {
-            const score = i + 1;
-            const getScoreColor = (score: number) => {
-              if (score <= 6) return ['bg-red-500 hover:bg-red-600', 'bg-red-300'];
-              if (score <= 8) return ['bg-yellow-500 hover:bg-yellow-600', 'bg-yellow-300'];
-              return ['bg-green-500 hover:bg-green-600', 'bg-green-300'];
-            };
-            const [activeColor, inactiveColor] = getScoreColor(score);
-
-            return (
-              <button
-                key={score}
-                onClick={() => setNpsScore(score)}
-                className={`w-8 h-8 rounded-full text-white font-semibold transition-all duration-200
-                  ${npsScore === score ? activeColor + ' ring-2 ring-blue-500 ring-offset-2' : inactiveColor + ' opacity-60 hover:opacity-80'}`}
-              >
-                {score}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex justify-between mt-1">
-          <span className="text-sm text-gray-500">Not likely</span>
-          <span className="text-sm text-gray-500">Very likely</span>
-        </div>
-      </div>
-
-      <div className="mb-8">
-        <p className="text-gray-600 mb-4">
-          Tell us about your experience (max 5 minutes):
-        </p>
-        <AudioRecorder 
-          onRecordingComplete={setAudioBlob}
-          ref={audioRecorderRef}
-        />
-      </div>
-
-      <div className="mb-8">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            className="mt-1"
-          />
-          <span className="text-sm text-gray-600">
-            I consent to Ruggable collecting and processing my voice recording and feedback. 
-            I understand this data will be used to improve products and services.
-          </span>
-        </label>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-          {error}
-        </div>
-      )}
-
-      <button
-        onClick={handleSubmit}
-        disabled={isSubmitting}
-        className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 
-                 disabled:cursor-not-allowed text-white font-semibold py-3 
-                 px-4 rounded-lg flex items-center justify-center gap-2"
-      >
-        {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
-      </button>
-    </div>
-  );
-};
-
-export default FeedbackForm;
+export default AudioRecorder;
