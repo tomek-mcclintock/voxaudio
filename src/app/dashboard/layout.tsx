@@ -17,34 +17,39 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  // Get user's company data
-  const { data: userData, error: companyError } = await supabase
+  // First get the user's company_id
+  const { data: userData, error: userError2 } = await supabase
     .from('users')
-    .select(`
-      company_id,
-      company:companies (
-        id,
-        name,
-        logo_url,
-        primary_color
-      )
-    `)
+    .select('company_id')
     .eq('email', user.email)
     .single();
 
-  if (companyError || !userData?.company) {
+  if (userError2 || !userData?.company_id) {
+    console.error('User company fetch error:', userError2);
     redirect('/login');
   }
 
-  const companyData: CompanyContextType = {
-    id: userData.company.id,
-    name: userData.company.name,
-    logo_url: userData.company.logo_url,
-    primary_color: userData.company.primary_color
+  // Then get the company details
+  const { data: companyData, error: companyError } = await supabase
+    .from('companies')
+    .select('id, name, logo_url, primary_color')
+    .eq('id', userData.company_id)
+    .single();
+
+  if (companyError || !companyData) {
+    console.error('Company fetch error:', companyError);
+    redirect('/login');
+  }
+
+  const company: CompanyContextType = {
+    id: companyData.id,
+    name: companyData.name,
+    logo_url: companyData.logo_url,
+    primary_color: companyData.primary_color
   };
 
   return (
-    <CompanyProvider company={companyData}>
+    <CompanyProvider company={company}>
       {children}
     </CompanyProvider>
   );
