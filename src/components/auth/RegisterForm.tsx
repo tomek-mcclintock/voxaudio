@@ -1,6 +1,9 @@
-// src/components/auth/RegisterForm.tsx
+'use client';
+
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+
+// Rest of the RegisterForm component code stays the same
 
 export default function RegisterForm() {
   const router = useRouter();

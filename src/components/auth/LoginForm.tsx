@@ -1,7 +1,9 @@
-// src/components/auth/LoginForm.tsx
+'use client';
+
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+// Rest of the LoginForm component code stays the same
 export default function LoginForm() {
   const router = useRouter();
   const [credentials, setCredentials] = useState({
