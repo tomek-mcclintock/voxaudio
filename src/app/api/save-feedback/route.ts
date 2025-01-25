@@ -12,11 +12,12 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const orderId = formData.get('orderId') as string;
     const npsScore = parseInt(formData.get('npsScore') as string);
+    const companyId = formData.get('companyId') as string;
     const audioFile = formData.get('audio') as Blob | null;
 
-    console.log('Received data:', { orderId, npsScore, hasAudio: !!audioFile });
+    console.log('Received data:', { orderId, npsScore, companyId, hasAudio: !!audioFile });
 
-    if (!orderId || !npsScore) {
+    if (!orderId || !npsScore || !companyId) {
       console.log('Missing required fields');
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(arrayBuffer);
 
         console.log('Uploading to S3...');
-        voiceFileUrl = await uploadVoiceRecording(buffer, orderId);
+        voiceFileUrl = await uploadVoiceRecording(buffer, `${companyId}/${orderId}`);
         console.log('S3 upload complete:', voiceFileUrl);
 
         console.log('Transcribing audio...');
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
     const { error: dbError } = await supabase
       .from('feedback_submissions')
       .insert({
+        company_id: companyId,
         order_id: orderId,
         nps_score: npsScore,
         voice_file_url: voiceFileUrl,

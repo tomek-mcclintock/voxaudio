@@ -7,9 +7,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function generateDailySummary() {
+export async function generateDailySummary(companyId: string) {
   try {
-    console.log('Starting daily summary generation...');
+    console.log('Starting daily summary generation for company:', companyId);
     
     // Get today's date range
     const today = new Date();
@@ -17,11 +17,12 @@ export async function generateDailySummary() {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Fetch today's feedback
+    // Fetch today's feedback for this company
     console.log('Fetching feedback...');
     const { data: feedbackEntries, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .select('*')
+      .eq('company_id', companyId)
       .gte('created_at', today.toISOString())
       .lt('created_at', tomorrow.toISOString());
 
@@ -66,7 +67,7 @@ export async function generateDailySummary() {
       messages: [
         {
           role: "system",
-          content: "You are analyzing customer feedback for Ruggable UK. Analyze the feedback and provide a response in this exact JSON format: {\"positiveThemes\": [\"theme1\", \"theme2\"], \"negativeThemes\": [\"theme1\", \"theme2\"], \"summary\": \"overall summary\"}"
+          content: "You are analyzing customer feedback. Analyze the feedback and provide a response in this exact JSON format: {\"positiveThemes\": [\"theme1\", \"theme2\"], \"negativeThemes\": [\"theme1\", \"theme2\"], \"summary\": \"overall summary\"}"
         },
         {
           role: "user",
@@ -84,7 +85,6 @@ export async function generateDailySummary() {
       analysis = JSON.parse(analysisText || '{}');
     } catch (e) {
       console.error('Error parsing GPT response:', e);
-      // If JSON parsing fails, create a structured response from the text
       analysis = {
         positiveThemes: [],
         negativeThemes: [],
@@ -102,20 +102,21 @@ export async function generateDailySummary() {
   }
 }
 
-export async function generateMonthlySummary() {
+export async function generateMonthlySummary(companyId: string) {
   try {
-    console.log('Starting monthly summary generation...');
+    console.log('Starting monthly summary generation for company:', companyId);
     
     // Get first day of current month
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
     
-    // Fetch all feedback for the month
+    // Fetch all feedback for the month for this company
     console.log('Fetching monthly feedback...');
     const { data: feedbackEntries, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .select('*')
+      .eq('company_id', companyId)
       .gte('created_at', startOfMonth.toISOString())
       .lt('created_at', new Date().toISOString());
 
@@ -160,7 +161,7 @@ export async function generateMonthlySummary() {
     // Compile all transcriptions
     const transcriptions = feedbackEntries
       .filter(entry => entry.transcription)
-      .map(entry => entry.transcription)
+      .map(entry => `Feedback (NPS Score ${entry.nps_score}): ${entry.transcription}`)
       .join('\n\n');
 
     let analysis = {
@@ -176,7 +177,7 @@ export async function generateMonthlySummary() {
         messages: [
           {
             role: "system",
-            content: "You are analyzing monthly customer feedback for Ruggable UK. You will provide a JSON response with themes and insights."
+            content: "You are analyzing monthly customer feedback. Provide a JSON response with themes and insights."
           },
           {
             role: "user",

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useCompany } from '@/lib/contexts/CompanyContext';
 import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -26,45 +27,43 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [analysisRunning, setAnalysisRunning] = useState(false);
-
-  const fetchDashboardData = async () => {
-    try {
-      const timestamp = new Date().getTime();
-      const response = await fetch(`/api/dashboard?timestamp=${timestamp}`, {
-        cache: 'no-store',
-        next: { revalidate: 0 },
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
+    const company = useCompany();
+    const [data, setData] = useState<DashboardData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [analysisRunning, setAnalysisRunning] = useState(false);
+  
+    const fetchDashboardData = async () => {
+      try {
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/dashboard?timestamp=${timestamp}`, {
+          cache: 'no-store',
+          next: { revalidate: 0 },
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard data');
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
-      }
-
-      const result = await response.json();
-      console.log('Dashboard data fetched at:', new Date().toISOString(), result);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      // Only update if we got new data
-      if (result.recentFeedback?.length || result.dailySummaries?.length) {
+  
+        const result = await response.json();
+        console.log('Dashboard data fetched at:', new Date().toISOString(), result);
+        
+        if (result.error) {
+          throw new Error(result.error);
+        }
+  
         setData(result);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };  
 
   useEffect(() => {
     fetchDashboardData();
@@ -166,7 +165,7 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Ruggable Feedback Dashboard</h1>
+        <h1 className="text-3xl font-bold">{company.name} Feedback Dashboard</h1>
         <div className="flex gap-4">
           <button
             onClick={exportToExcel}

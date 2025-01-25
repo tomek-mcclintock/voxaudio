@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { generateDailySummary, generateMonthlySummary } from '@/lib/analysis';
-import { supabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Starting analysis process...');
+    const supabase = createRouteHandlerClient({ cookies });
+
+    // Get current user's session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+
+    // Get user's company_id
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('company_id')
+      .eq('email', user?.email)
+      .single();
+
+    if (userError) throw userError;
+
+    const companyId = userData.company_id;
+    console.log('Running analysis for company:', companyId);
     
     // Get current date info
     const now = new Date();
@@ -14,13 +31,14 @@ export async function POST(request: NextRequest) {
 
     // Always run daily analysis
     console.log('Running daily analysis...');
-    const dailyAnalysis = await generateDailySummary();
+    const dailyAnalysis = await generateDailySummary(companyId);
 
     // Save daily analysis
     console.log('Saving daily analysis...');
     const { error: dailyError } = await supabase
       .from('daily_summaries')
       .insert({
+        company_id: companyId,
         date: now.toISOString().split('T')[0],
         nps_average: dailyAnalysis.npsAverage,
         positive_themes: dailyAnalysis.positiveThemes,
@@ -40,12 +58,13 @@ export async function POST(request: NextRequest) {
     let monthlyAnalysis = null;
     if (isLastDayOfMonth) {
       console.log('Running monthly analysis...');
-      monthlyAnalysis = await generateMonthlySummary();
+      monthlyAnalysis = await generateMonthlySummary(companyId);
 
       console.log('Saving monthly analysis...');
       const { error: monthlyError } = await supabase
         .from('monthly_summaries')
         .insert({
+          company_id: companyId,
           year_month: monthlyAnalysis.yearMonth,
           nps_average: monthlyAnalysis.npsAverage,
           nps_trend: monthlyAnalysis.npsTrend,
