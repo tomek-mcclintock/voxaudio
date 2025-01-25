@@ -4,15 +4,20 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import FeedbackForm from '@/components/FeedbackForm';
 import Header from '@/components/Header';
+import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
+
+interface SearchParams {
+  id?: string;
+  cid?: string;
+}
 
 export default async function FeedbackPage({
   searchParams,
 }: {
-  searchParams: { id?: string; cid?: string };
+  searchParams: SearchParams;
 }) {
-  // Validate company ID and order ID
   const supabase = createServerComponentClient({ cookies });
-  let companyData = null;
+  let companyData: CompanyContextType | null = null;
 
   if (searchParams.cid) {
     const { data: company } = await supabase
@@ -21,7 +26,14 @@ export default async function FeedbackPage({
       .eq('id', searchParams.cid)
       .single();
     
-    companyData = company;
+    if (company) {
+      companyData = {
+        id: company.id,
+        name: company.name,
+        logo_url: company.logo_url,
+        primary_color: company.primary_color
+      };
+    }
   }
 
   if (!searchParams.id || !searchParams.cid || !companyData) {

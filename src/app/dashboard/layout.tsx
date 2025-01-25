@@ -1,7 +1,7 @@
 // src/app/dashboard/layout.tsx
 import { cookies } from 'next/headers';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { CompanyProvider } from '@/lib/contexts/CompanyContext';
+import { CompanyProvider, CompanyContextType } from '@/lib/contexts/CompanyContext';
 import { redirect } from 'next/navigation';
 
 export default async function DashboardLayout({
@@ -22,7 +22,7 @@ export default async function DashboardLayout({
     .from('users')
     .select(`
       company_id,
-      companies (
+      company:companies (
         id,
         name,
         logo_url,
@@ -32,12 +32,19 @@ export default async function DashboardLayout({
     .eq('email', user.email)
     .single();
 
-  if (companyError || !userData?.companies) {
+  if (companyError || !userData?.company) {
     redirect('/login');
   }
 
+  const companyData: CompanyContextType = {
+    id: userData.company.id,
+    name: userData.company.name,
+    logo_url: userData.company.logo_url,
+    primary_color: userData.company.primary_color
+  };
+
   return (
-    <CompanyProvider company={userData.companies}>
+    <CompanyProvider company={companyData}>
       {children}
     </CompanyProvider>
   );

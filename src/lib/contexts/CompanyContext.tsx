@@ -3,11 +3,11 @@
 
 import { createContext, useContext, ReactNode } from 'react';
 
-interface CompanyContextType {
+export interface CompanyContextType {
   id: string;
   name: string;
-  logo_url?: string;
-  primary_color?: string;
+  logo_url?: string | null;
+  primary_color?: string | null;
 }
 
 const CompanyContext = createContext<CompanyContextType | null>(null);
