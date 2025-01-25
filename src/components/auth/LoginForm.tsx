@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Rest of the LoginForm component code stays the same
 export default function LoginForm() {
   const router = useRouter();
   const [credentials, setCredentials] = useState({
@@ -31,8 +30,15 @@ export default function LoginForm() {
         throw new Error(data.error || 'Login failed');
       }
 
+      // Add console logs for debugging
+      console.log('Login successful, redirecting...');
+      
+      // Force redirect to dashboard
       router.push('/dashboard');
+      router.refresh();
+
     } catch (err) {
+      console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);
