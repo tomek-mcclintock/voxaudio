@@ -6,33 +6,34 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
 
+  // Refresh session if expired
   const {
     data: { session },
+    error,
   } = await supabase.auth.getSession();
 
-  // Protected routes
-  if (req.nextUrl.pathname.startsWith('/dashboard') ||
-      req.nextUrl.pathname.startsWith('/api/companies')) {
+  console.log('Middleware session check:', session ? 'Found session' : 'No session');
+  if (error) console.error('Session error:', error);
+
+  // Handle protected routes
+  if (req.nextUrl.pathname.startsWith('/dashboard')) {
     if (!session) {
-      return NextResponse.redirect(new URL('/login', req.url));
+      const redirectUrl = new URL('/login', req.url);
+      console.log('No session, redirecting to:', redirectUrl.toString());
+      return NextResponse.redirect(redirectUrl);
     }
   }
 
-  // Auth routes - redirect if already logged in
-  if ((req.nextUrl.pathname === '/login' || 
-       req.nextUrl.pathname === '/register') && 
-      session) {
-    return NextResponse.redirect(new URL('/dashboard', req.url));
+  // Handle auth routes when already logged in
+  if (req.nextUrl.pathname === '/login' && session) {
+    const redirectUrl = new URL('/dashboard', req.url);
+    console.log('Session exists, redirecting to:', redirectUrl.toString());
+    return NextResponse.redirect(redirectUrl);
   }
 
   return res;
 }
 
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/api/companies/:path*',
-    '/login',
-    '/register'
-  ],
+  matcher: ['/dashboard/:path*', '/login']
 };

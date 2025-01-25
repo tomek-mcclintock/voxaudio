@@ -1,36 +1,37 @@
+// src/app/api/auth/login/route.ts
+import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Processing login request...');
     const { email, password } = await request.json();
-
+    
     if (!email || !password) {
-      console.log('Missing credentials');
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    console.log('Attempting Supabase auth...');
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // Create Supabase client with cookies
+    const supabase = createRouteHandlerClient({ cookies });
+
+    const { data: { session }, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
     });
 
-    if (error) {
-      console.error('Supabase auth error:', error);
+    if (authError) {
+      console.error('Auth error:', authError);
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
-    console.log('Auth successful, fetching user data...');
     // Get user's company info
     const { data: userData, error: userError } = await supabase
       .from('users')
@@ -55,10 +56,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Login successful');
     return NextResponse.json({
       success: true,
-      session: data.session,
+      session,
       user: userData
     });
 
