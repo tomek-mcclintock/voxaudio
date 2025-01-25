@@ -1,10 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginForm() {
-  const router = useRouter();
   const [credentials, setCredentials] = useState({
     email: '',
     password: ''
@@ -30,12 +28,10 @@ export default function LoginForm() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Add console logs for debugging
       console.log('Login successful, redirecting...');
       
-      // Force redirect to dashboard
-      router.push('/dashboard');
-      router.refresh();
+      // Force redirect using window.location
+      window.location.href = '/dashboard';
 
     } catch (err) {
       console.error('Login error:', err);
