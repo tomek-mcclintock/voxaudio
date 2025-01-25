@@ -1,22 +1,34 @@
+// src/components/Header.tsx
 'use client';
 
 import Image from 'next/image';
+import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
 
-export default function Header() {
+interface HeaderProps {
+  companyData?: CompanyContextType | null;
+}
+
+export default function Header({ companyData }: HeaderProps) {
   return (
     <header className="bg-white border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <div style={{ position: 'relative', height: '32px', width: '120px' }}>
-              <Image
-                src="/ruggable-logo.svg"
-                alt="Ruggable"
-                fill
-                style={{ objectFit: 'contain' }}
-                priority
-              />
-            </div>
+            {companyData?.logo_url ? (
+              <div style={{ position: 'relative', height: '32px', width: '120px' }}>
+                <Image
+                  src={companyData.logo_url}
+                  alt={companyData.name}
+                  fill
+                  style={{ objectFit: 'contain' }}
+                  priority
+                />
+              </div>
+            ) : (
+              <div className="text-xl font-semibold">
+                {companyData?.name || 'Company Feedback'}
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-4">
             <a 

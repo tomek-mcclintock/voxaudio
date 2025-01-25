@@ -2,12 +2,15 @@
 
 import React, { useState, useRef } from 'react';
 import AudioRecorder, { AudioRecorderRef } from './AudioRecorder';
+import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
 
 interface FeedbackFormProps {
   orderId: string;
+  companyId: string;
+  companyData: CompanyContextType;
 }
 
-const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId }) => {
+const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId, companyId, companyData }) => {
   const [npsScore, setNpsScore] = useState<number | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
