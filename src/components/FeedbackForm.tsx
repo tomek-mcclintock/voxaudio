@@ -13,10 +13,17 @@ const BRAND = {
   primary: '#657567',
   cta: '#934b32',
   ctaHover: '#833f2a',
-};
+} as const;
+
+// Button component types
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'outline';
+  children: React.ReactNode;
+  className?: string;
+}
 
 // Branded Button Component
-const Button = ({ 
+const Button: React.FC<ButtonProps> = ({ 
   children, 
   variant = 'primary',
   disabled = false,
