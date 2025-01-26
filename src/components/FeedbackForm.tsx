@@ -8,12 +8,13 @@ import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
 import type { Campaign, CampaignQuestion } from '@/types/campaign';
 import { TextQuestion, RatingQuestion, MultipleChoiceQuestion, YesNoQuestion } from './questions/QuestionTypes';
 
-// Ruggable's brand colors
-const BRAND = {
-  primary: '#657567',
-  cta: '#934b32',
-  ctaHover: '#833f2a',
-} as const;
+interface FeedbackFormProps {
+  orderId: string;
+  companyId: string;
+  campaignId?: string;
+  companyData: CompanyContextType | null;
+  campaignData: Campaign | null;
+}
 
 // Button component types
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -34,9 +35,9 @@ const Button: React.FC<ButtonProps> = ({
   const baseStyles = 'px-4 py-3 rounded-lg font-manrope font-semibold transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: `bg-[${BRAND.cta}] hover:bg-[${BRAND.ctaHover}] text-white`,
-    secondary: `bg-[${BRAND.primary}] hover:opacity-90 text-white`,
-    outline: `border-2 border-[${BRAND.primary}] text-[${BRAND.primary}] hover:bg-gray-50`,
+    primary: 'bg-[#934b32] hover:bg-[#833f2a] text-white',
+    secondary: 'bg-[#657567] hover:bg-[#4d594d] text-white',
+    outline: 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50',
   };
 
   return (
@@ -50,14 +51,6 @@ const Button: React.FC<ButtonProps> = ({
     </button>
   );
 };
-
-interface FeedbackFormProps {
-  orderId: string;
-  companyId: string;
-  campaignId?: string;
-  companyData: CompanyContextType | null;
-  campaignData: Campaign | null;
-}
 
 export default function FeedbackForm({ 
   orderId, 
@@ -201,21 +194,34 @@ export default function FeedbackForm({
             {[...Array(10)].map((_, i) => {
               const score = i + 1;
               const getScoreColor = (score: number) => {
-                if (score <= 6) return ['bg-red-500 hover:bg-red-600 text-white', 'bg-red-100 text-red-600'];
-                if (score <= 8) return ['bg-yellow-500 hover:bg-yellow-600 text-white', 'bg-yellow-100 text-yellow-600'];
-                return ['bg-green-500 hover:bg-green-600 text-white', 'bg-green-100 text-green-600'];
-              };              
-              const [activeColor, inactiveColor] = getScoreColor(score);
+                if (score <= 6) {
+                  return npsScore === null
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : npsScore === score
+                    ? 'bg-red-500 text-white ring-2 ring-red-500 ring-offset-2'
+                    : 'bg-red-200 text-red-700 opacity-60';
+                }
+                if (score <= 8) {
+                  return npsScore === null
+                    ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                    : npsScore === score
+                    ? 'bg-yellow-500 text-white ring-2 ring-yellow-500 ring-offset-2'
+                    : 'bg-yellow-200 text-yellow-700 opacity-60';
+                }
+                return npsScore === null
+                  ? 'bg-green-500 text-white hover:bg-green-600'
+                  : npsScore === score
+                  ? 'bg-green-500 text-white ring-2 ring-green-500 ring-offset-2'
+                  : 'bg-green-200 text-green-700 opacity-60';
+              };
 
               return (
                 <button
                   key={score}
                   type="button"
                   onClick={() => setNpsScore(score)}
-                  className={`w-12 h-12 rounded-lg text-white font-manrope font-semibold transition-all duration-200
-                    ${npsScore === score 
-                      ? `${activeColor} ring-2 ring-[${BRAND.primary}] ring-offset-2` 
-                      : `${inactiveColor} opacity-60 hover:opacity-80`}`}
+                  className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
+                    ${getScoreColor(score)}`}
                 >
                   {score}
                 </button>
@@ -229,77 +235,34 @@ export default function FeedbackForm({
         </div>
       )}
 
-      {/* Additional Questions */}
-      {campaignData?.include_additional_questions && campaignData.questions.length > 0 && (
-        <div className="space-y-8 mb-8">
-          {campaignData.questions.map((question) => (
-            <div key={question.id} className="space-y-2">
-              <label className="block font-manrope font-semibold text-gray-700">
-                {question.text}
-                {question.required && <span className="text-red-500 ml-1">*</span>}
-              </label>
-
-              <div className="mt-2">
-                {question.type === 'text' && (
-                  <TextQuestion
-                    question={question}
-                    value={questionResponses[question.id]}
-                    onChange={(value) => handleQuestionResponse(question.id, value)}
-                  />
-                )}
-                {question.type === 'rating' && (
-                  <RatingQuestion
-                    question={question}
-                    value={questionResponses[question.id]}
-                    onChange={(value) => handleQuestionResponse(question.id, value)}
-                  />
-                )}
-                {question.type === 'multiple_choice' && (
-                  <MultipleChoiceQuestion
-                    question={question}
-                    value={questionResponses[question.id]}
-                    onChange={(value) => handleQuestionResponse(question.id, value)}
-                  />
-                )}
-                {question.type === 'yes_no' && (
-                  <YesNoQuestion
-                    question={question}
-                    value={questionResponses[question.id]}
-                    onChange={(value) => handleQuestionResponse(question.id, value)}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Voice/Text Feedback Section */}
       <div className="space-y-4 mb-8">
         <p className="font-manrope font-semibold text-gray-700">Additional feedback:</p>
         
         {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
           <div className="flex justify-center space-x-4 mb-6">
-<Button
-  variant={feedbackType === 'voice' ? 'primary' : 'outline'}
-  onClick={() => setFeedbackType('voice')}
-  className="text-white hover:text-white" // Add this to ensure text stays white when selected
->
-  <div className="flex items-center gap-2">
-    <Mic className="w-5 h-5" />
-    Voice Feedback
-  </div>
-</Button>
-<Button
-  variant={feedbackType === 'text' ? 'primary' : 'outline'}
-  onClick={() => setFeedbackType('text')}
-  className="text-white hover:text-white" // Add this to ensure text stays white when selected
->
-  <div className="flex items-center gap-2">
-    <MessageSquare className="w-5 h-5" />
-    Text Feedback
-  </div>
-</Button>
+            <button
+              onClick={() => setFeedbackType('voice')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 
+                ${feedbackType === 'voice'
+                  ? 'bg-[#934b32] text-white'
+                  : 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50'
+                }`}
+            >
+              <Mic className="w-5 h-5" />
+              Voice Feedback
+            </button>
+            <button
+              onClick={() => setFeedbackType('text')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
+                ${feedbackType === 'text'
+                  ? 'bg-[#934b32] text-white'
+                  : 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50'
+                }`}
+            >
+              <MessageSquare className="w-5 h-5" />
+              Text Feedback
+            </button>
           </div>
         )}
 
@@ -348,13 +311,15 @@ export default function FeedbackForm({
           </div>
         )}
 
-        <Button
+        <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full"
+          className="w-full bg-[#934b32] hover:bg-[#833f2a] disabled:bg-gray-300 disabled:cursor-not-allowed 
+                   text-white font-manrope font-semibold py-3 px-4 rounded-lg 
+                   flex items-center justify-center gap-2 transition-colors duration-200"
         >
           {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
-        </Button>
+        </button>
       </div>
     </div>
   );
