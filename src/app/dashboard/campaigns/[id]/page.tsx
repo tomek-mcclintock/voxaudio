@@ -45,7 +45,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
 
   const fetchCampaignData = async () => {
     try {
-      const response = await fetch(`/api/campaigns/${params.id}`);
+      const response = await fetch(`/api/campaigns/details/${params.id}`);
       const data = await response.json();
       
       if (response.ok) {
