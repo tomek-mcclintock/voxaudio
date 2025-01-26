@@ -151,7 +151,7 @@ export default function FeedbackForm({
       {campaignData?.include_nps && (
         <div className="mb-8">
           <p className="text-gray-600 mb-4">
-            {campaignData.nps_question}
+            {campaignData.npsQuestion}
           </p>
           <div className="flex justify-between gap-1">
             {[...Array(10)].map((_, i) => {
