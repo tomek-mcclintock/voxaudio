@@ -1,4 +1,3 @@
-// src/components/CampaignForm.tsx
 'use client';
 
 import { useState } from 'react';
@@ -46,17 +45,25 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
     setQuestions([...questions, newQuestion]);
   };
 
-  const removeQuestion = (id: string) => {
-    setQuestions(questions.filter(q => q.id !== id));
-  };
-
   const updateQuestion = (id: string, updates: Partial<CampaignQuestion>) => {
-    setQuestions(questions.map(q => 
-      q.id === id ? { ...q, ...updates } : q
-    ));
+    setQuestions(questions.map(q => {
+      if (q.id !== id) return q;
+      
+      // For scale updates, ensure we maintain required min/max values
+      if (updates.scale && q.scale) {
+        updates.scale = {
+          min: updates.scale.min ?? q.scale.min,
+          max: updates.scale.max ?? q.scale.max,
+          minLabel: updates.scale.minLabel ?? q.scale.minLabel,
+          maxLabel: updates.scale.maxLabel ?? q.scale.maxLabel
+        };
+      }
+      
+      return { ...q, ...updates };
+    }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
       name,
@@ -69,7 +76,6 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Basic Details */}
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Campaign Name</label>
@@ -104,7 +110,6 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
         </div>
       </div>
 
-      {/* Settings */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium">Settings</h3>
         <div className="space-y-2">
@@ -135,7 +140,6 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
         </div>
       </div>
 
-      {/* Questions */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium">Questions</h3>
@@ -172,7 +176,7 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
         </div>
 
         <div className="space-y-4">
-          {questions.map((question, index) => (
+          {questions.map((question) => (
             <div key={question.id} className="bg-gray-50 p-4 rounded-lg">
               <div className="flex items-start gap-4">
                 <GripVertical className="w-5 h-5 text-gray-400 mt-2" />
@@ -185,16 +189,16 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
                     onChange={(e) => updateQuestion(question.id, { text: e.target.value })}
                   />
 
-                  {question.type === 'multiple_choice' && (
+                  {question.type === 'multiple_choice' && question.options && (
                     <div className="space-y-2">
-                      {question.options?.map((option, optionIndex) => (
+                      {question.options.map((option, optionIndex) => (
                         <div key={optionIndex} className="flex items-center gap-2">
                           <input
                             type="text"
                             className="flex-grow rounded-md border-gray-300 shadow-sm"
                             value={option}
                             onChange={(e) => {
-                              const newOptions = [...(question.options || [])];
+                              const newOptions = [...question.options!];
                               newOptions[optionIndex] = e.target.value;
                               updateQuestion(question.id, { options: newOptions });
                             }}
@@ -202,7 +206,7 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
                           <button
                             type="button"
                             onClick={() => {
-                              const newOptions = question.options?.filter((_, i) => i !== optionIndex);
+                              const newOptions = question.options!.filter((_, i) => i !== optionIndex);
                               updateQuestion(question.id, { options: newOptions });
                             }}
                             className="text-red-500 hover:text-red-700"
@@ -214,7 +218,7 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
                       <button
                         type="button"
                         onClick={() => {
-                          const newOptions = [...(question.options || []), `Option ${(question.options?.length || 0) + 1}`];
+                          const newOptions = [...question.options!, `Option ${question.options!.length + 1}`];
                           updateQuestion(question.id, { options: newOptions });
                         }}
                         className="text-sm text-blue-600 hover:text-blue-800"
@@ -231,9 +235,12 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
                         <input
                           type="text"
                           className="mt-1 w-full rounded-md border-gray-300 shadow-sm"
-                          value={question.scale.minLabel}
+                          value={question.scale.minLabel || ''}
                           onChange={(e) => updateQuestion(question.id, {
-                            scale: { ...question.scale, minLabel: e.target.value }
+                            scale: {
+                              ...question.scale!,
+                              minLabel: e.target.value
+                            }
                           })}
                         />
                       </div>
@@ -242,9 +249,12 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
                         <input
                           type="text"
                           className="mt-1 w-full rounded-md border-gray-300 shadow-sm"
-                          value={question.scale.maxLabel}
+                          value={question.scale.maxLabel || ''}
                           onChange={(e) => updateQuestion(question.id, {
-                            scale: { ...question.scale, maxLabel: e.target.value }
+                            scale: {
+                              ...question.scale!,
+                              maxLabel: e.target.value
+                            }
                           })}
                         />
                       </div>
@@ -263,7 +273,9 @@ export default function CampaignForm({ onSubmit, initialData }: CampaignFormProp
 
                 <button
                   type="button"
-                  onClick={() => removeQuestion(question.id)}
+                  onClick={() => {
+                    setQuestions(questions.filter(q => q.id !== question.id));
+                  }}
                   className="text-red-500 hover:text-red-700"
                 >
                   <Trash2 className="w-5 h-5" />

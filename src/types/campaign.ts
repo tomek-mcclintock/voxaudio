@@ -1,4 +1,12 @@
+// src/types/campaign.ts
 export type QuestionType = 'nps' | 'text' | 'rating' | 'multiple_choice' | 'yes_no';
+
+interface Scale {
+  min: number;
+  max: number;
+  minLabel?: string;
+  maxLabel?: string;
+}
 
 export interface CampaignQuestion {
   id: string;
@@ -6,12 +14,7 @@ export interface CampaignQuestion {
   text: string;
   required: boolean;
   options?: string[]; // For multiple choice questions
-  scale?: {
-    min: number;
-    max: number;
-    minLabel?: string;
-    maxLabel?: string;
-  }; // For rating questions
+  scale?: Scale; // For rating questions
 }
 
 export interface Campaign {
