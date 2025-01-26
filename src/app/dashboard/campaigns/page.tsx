@@ -4,26 +4,12 @@
 import { useState, useEffect } from 'react';
 import { useCompany } from '@/lib/contexts/CompanyContext';
 import { Plus, Link as LinkIcon, BarChart } from 'lucide-react';
-
-interface Campaign {
-  id: string;
-  name: string;
-  active: boolean;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-}
+import Link from 'next/link';
 
 export default function CampaignsPage() {
   const company = useCompany();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showNewCampaign, setShowNewCampaign] = useState(false);
-  const [newCampaign, setNewCampaign] = useState({
-    name: '',
-    start_date: '',
-    end_date: ''
-  });
 
   useEffect(() => {
     fetchCampaigns();
@@ -43,30 +29,9 @@ export default function CampaignsPage() {
     }
   };
 
-  const createCampaign = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const response = await fetch('/api/campaigns', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newCampaign),
-      });
-      
-      if (response.ok) {
-        setShowNewCampaign(false);
-        setNewCampaign({ name: '', start_date: '', end_date: '' });
-        fetchCampaigns();
-      }
-    } catch (error) {
-      console.error('Error creating campaign:', error);
-    }
-  };
-
   const copyFeedbackLink = async (campaignId: string) => {
-    const baseLink = `${window.location.origin}/feedback?cid=${company.id}&campaign=${campaignId}`;
-    await navigator.clipboard.writeText(baseLink);
+    const link = `${window.location.origin}/feedback?cid=${company.id}&campaign=${campaignId}`;
+    await navigator.clipboard.writeText(link);
     alert('Feedback link copied to clipboard!');
   };
 
@@ -78,67 +43,14 @@ export default function CampaignsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">Feedback Campaigns</h1>
-        <button
-          onClick={() => setShowNewCampaign(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        <Link
+          href="/dashboard/campaigns/new"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
           New Campaign
-        </button>
+        </Link>
       </div>
-
-      {showNewCampaign && (
-        <div className="bg-white p-6 rounded-lg shadow mb-8">
-          <h2 className="text-lg font-semibold mb-4">Create New Campaign</h2>
-          <form onSubmit={createCampaign} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Campaign Name</label>
-              <input
-                type="text"
-                required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                value={newCampaign.name}
-                onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                <input
-                  type="date"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                  value={newCampaign.start_date}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, start_date: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">End Date</label>
-                <input
-                  type="date"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                  value={newCampaign.end_date}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, end_date: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-4">
-              <button
-                type="button"
-                onClick={() => setShowNewCampaign(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-              >
-                Create Campaign
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
@@ -146,6 +58,9 @@ export default function CampaignsPage() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Campaign Name
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Questions
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Date Range
@@ -159,10 +74,15 @@ export default function CampaignsPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {campaigns.map((campaign) => (
+            {campaigns.map((campaign: any) => (
               <tr key={campaign.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-500">
+                    {campaign.questions?.length || 0} questions
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-500">
@@ -187,13 +107,13 @@ export default function CampaignsPage() {
                     >
                       <LinkIcon className="w-5 h-5" />
                     </button>
-                    <button
-                      onClick={() => window.location.href = `/dashboard/campaigns/${campaign.id}`}
+                    <Link
+                      href={`/dashboard/campaigns/${campaign.id}`}
                       className="text-blue-600 hover:text-blue-900"
                       title="View campaign analytics"
                     >
                       <BarChart className="w-5 h-5" />
-                    </button>
+                    </Link>
                   </div>
                 </td>
               </tr>
