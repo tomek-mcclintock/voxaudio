@@ -12,11 +12,13 @@ export async function POST(request: NextRequest) {
     
     const formData = await request.formData();
     const orderId = formData.get('orderId') as string;
-    const npsScore = parseInt(formData.get('npsScore') as string);
+    const npsScore = formData.get('npsScore') ? parseInt(formData.get('npsScore') as string) : null;
     const companyId = formData.get('companyId') as string;
     const campaignId = formData.get('campaignId') as string;
     const audioFile = formData.get('audio') as Blob | null;
     const textFeedback = formData.get('textFeedback') as string | null;
+    const questionResponsesStr = formData.get('questionResponses') as string | null;
+    const questionResponses = questionResponsesStr ? JSON.parse(questionResponsesStr) : null;
 
     console.log('Received data:', { 
       orderId, 
@@ -24,10 +26,11 @@ export async function POST(request: NextRequest) {
       companyId, 
       campaignId, 
       hasAudio: !!audioFile,
-      hasText: !!textFeedback 
+      hasText: !!textFeedback,
+      hasQuestionResponses: !!questionResponses
     });
 
-    if (!orderId || !npsScore || !companyId || !campaignId) {
+    if (!orderId || !companyId || !campaignId) {
       console.log('Missing required fields');
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Validate campaign exists and belongs to company
     const { data: campaign, error: campaignError } = await supabase
       .from('feedback_campaigns')
-      .select('id')
+      .select('*')
       .eq('id', campaignId)
       .eq('company_id', companyId)
       .single();
@@ -83,7 +86,6 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (textFeedback) {
-      // Use the text feedback directly
       transcription = textFeedback;
       try {
         console.log('Analyzing text feedback...');
@@ -95,8 +97,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('Saving to database...');
-    const { error: dbError } = await supabase
+    // Start a database transaction
+    const { data: feedback, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .insert({
         company_id: companyId,
@@ -107,14 +109,35 @@ export async function POST(request: NextRequest) {
         transcription,
         sentiment,
         processed: false,
-      });
+      })
+      .select()
+      .single();
 
-    if (dbError) {
-      console.error('Database error:', dbError);
+    if (feedbackError) {
+      console.error('Database error:', feedbackError);
       return NextResponse.json(
         { error: 'Failed to save feedback' },
         { status: 500 }
       );
+    }
+
+    // Save question responses if any
+    if (questionResponses && feedback) {
+      const questionResponsesArray = Object.entries(questionResponses).map(([questionId, value]) => ({
+        feedback_submission_id: feedback.id,
+        question_id: questionId,
+        response_value: typeof value === 'string' ? value : JSON.stringify(value)
+      }));
+
+      const { error: responsesError } = await supabase
+        .from('question_responses')
+        .insert(questionResponsesArray);
+
+      if (responsesError) {
+        console.error('Error saving question responses:', responsesError);
+        // Don't fail the whole submission if question responses fail
+        // but log it for monitoring
+      }
     }
 
     console.log('Feedback submission complete');

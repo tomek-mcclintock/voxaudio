@@ -1,4 +1,3 @@
-// src/components/FeedbackForm.tsx
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -50,20 +49,27 @@ export default function FeedbackForm({
       setError('Please accept the consent notice to submit feedback');
       return;
     }
+
+    if (campaignData?.includeNps && !npsScore) {
+      setError('Please provide an NPS score');
+      return;
+    }
     
-    if (!localOrderId && showOrderInput) {
+    if (!localOrderId && showOrderInput && campaignData?.settings.requireOrderId) {
       setError('Please provide an order ID');
       return;
     }
 
     // Validate required questions
-    const missingRequired = campaignData?.questions.some(
-      q => q.required && !questionResponses[q.id]
-    );
+    if (campaignData?.includeAdditionalQuestions) {
+      const missingRequired = campaignData.questions.some(
+        q => q.required && !questionResponses[q.id]
+      );
 
-    if (missingRequired) {
-      setError('Please answer all required questions');
-      return;
+      if (missingRequired) {
+        setError('Please answer all required questions');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -86,7 +92,12 @@ export default function FeedbackForm({
       if (campaignId) {
         formData.append('campaignId', campaignId);
       }
-      formData.append('questionResponses', JSON.stringify(questionResponses));
+      if (campaignData?.includeNps && npsScore) {
+        formData.append('npsScore', npsScore.toString());
+      }
+      if (Object.keys(questionResponses).length > 0) {
+        formData.append('questionResponses', JSON.stringify(questionResponses));
+      }
 
       const response = await fetch('/api/save-feedback', {
         method: 'POST',
@@ -136,103 +147,144 @@ export default function FeedbackForm({
         </div>
       )}
 
-      <div className="space-y-8">
-        {campaignData?.questions.map((question) => (
-          <div key={question.id} className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              {question.text}
-              {question.required && <span className="text-red-500 ml-1">*</span>}
-            </label>
+      {/* NPS Question */}
+      {campaignData?.includeNps && (
+        <div className="mb-8">
+          <p className="text-gray-600 mb-4">
+            {campaignData.npsQuestion}
+          </p>
+          <div className="flex justify-between gap-1">
+            {[...Array(10)].map((_, i) => {
+              const score = i + 1;
+              const getScoreColor = (score: number) => {
+                if (score <= 6) return ['bg-red-500 hover:bg-red-600', 'bg-red-300'];
+                if (score <= 8) return ['bg-yellow-500 hover:bg-yellow-600', 'bg-yellow-300'];
+                return ['bg-green-500 hover:bg-green-600', 'bg-green-300'];
+              };
+              const [activeColor, inactiveColor] = getScoreColor(score);
 
-            <div className="mt-1">
-              {question.type === 'text' && (
-                <TextQuestion
-                  question={question}
-                  value={questionResponses[question.id]}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-              {question.type === 'rating' && (
-                <RatingQuestion
-                  question={question}
-                  value={questionResponses[question.id]}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-              {question.type === 'multiple_choice' && (
-                <MultipleChoiceQuestion
-                  question={question}
-                  value={questionResponses[question.id]}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-              {question.type === 'yes_no' && (
-                <YesNoQuestion
-                  question={question}
-                  value={questionResponses[question.id]}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-            </div>
+              return (
+                <button
+                  key={score}
+                  type="button"
+                  onClick={() => setNpsScore(score)}
+                  className={`w-10 h-10 rounded-full text-white font-semibold transition-all duration-200
+                    ${npsScore === score ? activeColor + ' ring-2 ring-blue-500 ring-offset-2' : inactiveColor + ' opacity-60 hover:opacity-80'}`}
+                >
+                  {score}
+                </button>
+              );
+            })}
           </div>
-        ))}
-
-        <div className="border-t pt-6">
-          <p className="text-gray-700 mb-4">Additional feedback:</p>
-          
-          {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
-            <div className="flex justify-center space-x-4 mb-6">
-              <button
-                type="button"
-                onClick={() => setFeedbackType('voice')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                  feedbackType === 'voice'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <Mic className="w-5 h-5" />
-                Voice Feedback
-              </button>
-              <button
-                type="button"
-                onClick={() => setFeedbackType('text')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                  feedbackType === 'text'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <MessageSquare className="w-5 h-5" />
-                Text Feedback
-              </button>
-            </div>
-          )}
-
-          {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
-            <div>
-              <p className="text-gray-600 mb-4">
-                Record your feedback (max 5 minutes):
-              </p>
-              <AudioRecorder 
-                onRecordingComplete={setAudioBlob}
-                ref={audioRecorderRef}
-              />
-            </div>
-          ) : campaignData?.settings.allowText ? (
-            <div>
-              <textarea
-                className="w-full px-3 py-2 border border-gray-300 rounded-md h-32"
-                value={textFeedback}
-                onChange={(e) => setTextFeedback(e.target.value)}
-                placeholder="Please share your thoughts..."
-              />
-            </div>
-          ) : null}
+          <div className="flex justify-between mt-1">
+            <span className="text-sm text-gray-500">Not likely</span>
+            <span className="text-sm text-gray-500">Very likely</span>
+          </div>
         </div>
+      )}
+
+      {/* Additional Questions */}
+      {campaignData?.includeAdditionalQuestions && campaignData.questions.length > 0 && (
+        <div className="space-y-8 mb-8">
+          {campaignData.questions.map((question) => (
+            <div key={question.id} className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {question.text}
+                {question.required && <span className="text-red-500 ml-1">*</span>}
+              </label>
+
+              <div className="mt-1">
+                {question.type === 'text' && (
+                  <TextQuestion
+                    question={question}
+                    value={questionResponses[question.id]}
+                    onChange={(value) => handleQuestionResponse(question.id, value)}
+                  />
+                )}
+                {question.type === 'rating' && (
+                  <RatingQuestion
+                    question={question}
+                    value={questionResponses[question.id]}
+                    onChange={(value) => handleQuestionResponse(question.id, value)}
+                  />
+                )}
+                {question.type === 'multiple_choice' && (
+                  <MultipleChoiceQuestion
+                    question={question}
+                    value={questionResponses[question.id]}
+                    onChange={(value) => handleQuestionResponse(question.id, value)}
+                  />
+                )}
+                {question.type === 'yes_no' && (
+                  <YesNoQuestion
+                    question={question}
+                    value={questionResponses[question.id]}
+                    onChange={(value) => handleQuestionResponse(question.id, value)}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Voice/Text Feedback Section */}
+      <div className="space-y-4 mb-8">
+        <p className="text-gray-700">Additional feedback:</p>
+        
+        {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
+          <div className="flex justify-center space-x-4 mb-6">
+            <button
+              type="button"
+              onClick={() => setFeedbackType('voice')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                feedbackType === 'voice'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <Mic className="w-5 h-5" />
+              Voice Feedback
+            </button>
+            <button
+              type="button"
+              onClick={() => setFeedbackType('text')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                feedbackType === 'text'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <MessageSquare className="w-5 h-5" />
+              Text Feedback
+            </button>
+          </div>
+        )}
+
+        {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
+          <div>
+            <p className="text-gray-600 mb-4">
+              Record your feedback (max 5 minutes):
+            </p>
+            <AudioRecorder 
+              onRecordingComplete={setAudioBlob}
+              ref={audioRecorderRef}
+            />
+          </div>
+        ) : campaignData?.settings.allowText ? (
+          <div>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 rounded-md h-32"
+              value={textFeedback}
+              onChange={(e) => setTextFeedback(e.target.value)}
+              placeholder="Please share your thoughts..."
+            />
+          </div>
+        ) : null}
       </div>
 
-      <div className="mt-8">
+      {/* Consent and Submit */}
+      <div className="space-y-4">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -247,23 +299,23 @@ export default function FeedbackForm({
             View our full <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.
           </span>
         </label>
+
+        {error && (
+          <div className="p-3 bg-red-100 text-red-700 rounded-md">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 
+                   disabled:cursor-not-allowed text-white font-semibold py-3 
+                   px-4 rounded-lg flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
+        </button>
       </div>
-
-      {error && (
-        <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
-          {error}
-        </div>
-      )}
-
-      <button
-        onClick={handleSubmit}
-        disabled={isSubmitting}
-        className="mt-6 w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 
-                 disabled:cursor-not-allowed text-white font-semibold py-3 
-                 px-4 rounded-lg flex items-center justify-center gap-2"
-      >
-        {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
-      </button>
     </div>
   );
 }
