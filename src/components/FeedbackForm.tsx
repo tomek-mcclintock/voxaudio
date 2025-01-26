@@ -201,10 +201,10 @@ export default function FeedbackForm({
             {[...Array(10)].map((_, i) => {
               const score = i + 1;
               const getScoreColor = (score: number) => {
-                if (score <= 6) return ['bg-red-500 hover:bg-red-600', 'bg-red-100'];
-                if (score <= 8) return ['bg-yellow-500 hover:bg-yellow-600', 'bg-yellow-100'];
-                return [`bg-[${BRAND.primary}] hover:opacity-90`, 'bg-green-100'];
-              };
+                if (score <= 6) return ['bg-red-500 hover:bg-red-600 text-white', 'bg-red-100 text-red-600'];
+                if (score <= 8) return ['bg-yellow-500 hover:bg-yellow-600 text-white', 'bg-yellow-100 text-yellow-600'];
+                return ['bg-green-500 hover:bg-green-600 text-white', 'bg-green-100 text-green-600'];
+              };              
               const [activeColor, inactiveColor] = getScoreColor(score);
 
               return (
@@ -280,24 +280,26 @@ export default function FeedbackForm({
         
         {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
           <div className="flex justify-center space-x-4 mb-6">
-            <Button
-              variant={feedbackType === 'voice' ? 'primary' : 'outline'}
-              onClick={() => setFeedbackType('voice')}
-            >
-              <div className="flex items-center gap-2">
-                <Mic className="w-5 h-5" />
-                Voice Feedback
-              </div>
-            </Button>
-            <Button
-              variant={feedbackType === 'text' ? 'primary' : 'outline'}
-              onClick={() => setFeedbackType('text')}
-            >
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
-                Text Feedback
-              </div>
-            </Button>
+<Button
+  variant={feedbackType === 'voice' ? 'primary' : 'outline'}
+  onClick={() => setFeedbackType('voice')}
+  className="text-white hover:text-white" // Add this to ensure text stays white when selected
+>
+  <div className="flex items-center gap-2">
+    <Mic className="w-5 h-5" />
+    Voice Feedback
+  </div>
+</Button>
+<Button
+  variant={feedbackType === 'text' ? 'primary' : 'outline'}
+  onClick={() => setFeedbackType('text')}
+  className="text-white hover:text-white" // Add this to ensure text stays white when selected
+>
+  <div className="flex items-center gap-2">
+    <MessageSquare className="w-5 h-5" />
+    Text Feedback
+  </div>
+</Button>
           </div>
         )}
 

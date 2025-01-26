@@ -2,14 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Mic, Square, Play, Pause } from 'lucide-react';
-
-// Ruggable brand colors
-const BRAND = {
-  primary: '#657567',
-  cta: '#934b32',
-  ctaHover: '#833f2a',
-} as const;
+import { Mic, Square, Play, Pause, Trash2 } from 'lucide-react';
 
 export interface AudioRecorderRef {
   stopRecording: () => void;
@@ -25,7 +18,6 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [analyserData, setAnalyserData] = useState<number[]>(new Array(50).fill(0));
     
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -44,7 +36,6 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       }
     }));
 
-    // Setup audio context and analyser
     useEffect(() => {
       return () => {
         if (animationFrameRef.current) {
@@ -63,14 +54,12 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
       analyserRef.current.getByteFrequencyData(dataArray);
 
-      // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Draw visualization
+      
       const barWidth = canvas.width / 50;
       const heightMultiplier = canvas.height / 255;
       
-      ctx.fillStyle = BRAND.primary;
+      ctx.fillStyle = '#657567'; // Ruggable primary color
       
       for (let i = 0; i < 50; i++) {
         const value = dataArray[i * 2];
@@ -89,7 +78,6 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
 
-        // Set up audio context and analyser
         const audioContext = new AudioContext();
         const source = audioContext.createMediaStreamSource(stream);
         const analyser = audioContext.createAnalyser();
@@ -115,6 +103,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
 
         mediaRecorder.start();
         setIsRecording(true);
+        setRecordingTime(0);
         drawVisualizer();
         
         timerRef.current = setInterval(() => {
@@ -145,6 +134,17 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
           cancelAnimationFrame(animationFrameRef.current);
         }
       }
+    };
+
+    const discardRecording = () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setAudioBlob(null);
+      setIsPlaying(false);
+      setRecordingTime(0);
+      onRecordingComplete(null);
     };
 
     const togglePlayback = () => {
@@ -186,34 +186,40 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
           {!isRecording && !audioBlob ? (
             <button
               onClick={startRecording}
-              className={`p-4 rounded-full bg-[${BRAND.cta}] hover:bg-[${BRAND.ctaHover}] 
-                         transition-colors duration-200 text-white`}
+              className="p-4 rounded-full bg-[#934b32] hover:bg-[#833f2a] transition-colors duration-200"
               aria-label="Start recording"
             >
-              <Mic className="w-8 h-8" />
+              <Mic className="w-8 h-8 text-white" />
             </button>
           ) : isRecording ? (
             <button
               onClick={handleStopRecording}
-              className="p-4 rounded-full bg-red-500 hover:bg-red-600 
-                       transition-colors duration-200 text-white"
+              className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors duration-200"
               aria-label="Stop recording"
             >
-              <Square className="w-8 h-8" />
+              <Square className="w-8 h-8 text-white" />
             </button>
           ) : (
-            <button
-              onClick={togglePlayback}
-              className={`p-4 rounded-full bg-[${BRAND.primary}] hover:opacity-90
-                         transition-colors duration-200 text-white`}
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying ? (
-                <Pause className="w-8 h-8" />
-              ) : (
-                <Play className="w-8 h-8" />
-              )}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={togglePlayback}
+                className="p-4 rounded-full bg-[#657567] hover:bg-[#4d594d] transition-colors duration-200"
+                aria-label={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? (
+                  <Pause className="w-8 h-8 text-white" />
+                ) : (
+                  <Play className="w-8 h-8 text-white" />
+                )}
+              </button>
+              <button
+                onClick={discardRecording}
+                className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors duration-200"
+                aria-label="Discard recording"
+              >
+                <Trash2 className="w-8 h-8 text-white" />
+              </button>
+            </div>
           )}
 
           {/* Timer */}
@@ -230,7 +236,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
               Recording...
             </span>
           ) : audioBlob ? (
-            "Recording complete. Click play to review."
+            "Recording complete. Click play to review or trash to discard."
           ) : (
             "Click the microphone to start recording"
           )}
