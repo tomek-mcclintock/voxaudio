@@ -72,20 +72,26 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
+    const submitData = {
       name,
       start_date: startDate || null,
       end_date: endDate || null,
-      includeNps,
-      npsQuestion,
+      include_nps: includeNps,
+      nps_question: npsQuestion,
       questions: includeAdditionalQuestions ? questions : [],
       settings: {
         ...settings,
-        allowText: settings.allowText || !settings.allowVoice, // Ensure at least one feedback type is allowed
+        allowText: settings.allowText || !settings.allowVoice,
       },
-      includeAdditionalQuestions
-    });
+      include_additional_questions: includeAdditionalQuestions
+    };
+    
+    console.log('Client side - about to submit:', submitData);
+    console.log('NPS Question value:', npsQuestion);  // Check the specific value
+    onSubmit(submitData);
   };
+
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
