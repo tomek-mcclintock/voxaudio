@@ -22,8 +22,11 @@ export interface Campaign {
   name: string;
   company_id: string;
   active: boolean;
-  start_date?: string;
-  end_date?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  include_nps: boolean;  // Changed from includeNps to match database
+  nps_question: string | null;  // Added to match database
+  include_additional_questions: boolean;  // Changed from includeAdditionalQuestions to match database
   questions: CampaignQuestion[];
   settings: {
     allowVoice: boolean;

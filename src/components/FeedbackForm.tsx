@@ -50,7 +50,7 @@ export default function FeedbackForm({
       return;
     }
 
-    if (campaignData?.includeNps && !npsScore) {
+    if (campaignData?.include_nps && !npsScore) {
       setError('Please provide an NPS score');
       return;
     }
@@ -61,7 +61,7 @@ export default function FeedbackForm({
     }
 
     // Validate required questions
-    if (campaignData?.includeAdditionalQuestions) {
+    if (campaignData?.include_additional_questions) {
       const missingRequired = campaignData.questions.some(
         q => q.required && !questionResponses[q.id]
       );
@@ -92,7 +92,7 @@ export default function FeedbackForm({
       if (campaignId) {
         formData.append('campaignId', campaignId);
       }
-      if (campaignData?.includeNps && npsScore) {
+      if (campaignData?.include_nps && npsScore) {
         formData.append('npsScore', npsScore.toString());
       }
       if (Object.keys(questionResponses).length > 0) {
@@ -148,10 +148,10 @@ export default function FeedbackForm({
       )}
 
       {/* NPS Question */}
-      {campaignData?.includeNps && (
+      {campaignData?.include_nps && (
         <div className="mb-8">
           <p className="text-gray-600 mb-4">
-            {campaignData.npsQuestion}
+            {campaignData.nps_question}
           </p>
           <div className="flex justify-between gap-1">
             {[...Array(10)].map((_, i) => {
@@ -184,7 +184,7 @@ export default function FeedbackForm({
       )}
 
       {/* Additional Questions */}
-      {campaignData?.includeAdditionalQuestions && campaignData.questions.length > 0 && (
+      {campaignData?.include_additional_questions && campaignData.questions.length > 0 && (
         <div className="space-y-8 mb-8">
           {campaignData.questions.map((question) => (
             <div key={question.id} className="space-y-2">
