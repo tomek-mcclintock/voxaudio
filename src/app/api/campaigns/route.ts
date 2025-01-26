@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const campaignData = await request.json();
 
     // Create new campaign
-    const { data: campaign, error: createError } = await supabase
+        const { data: campaign, error: createError } = await supabase
       .from('feedback_campaigns')
       .insert([
         {
@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
           name: campaignData.name,
           start_date: campaignData.start_date || null,
           end_date: campaignData.end_date || null,
+          include_nps: campaignData.include_nps ?? true,  // Added
+          nps_question: campaignData.nps_question || null,  // Added
+          include_additional_questions: campaignData.include_additional_questions ?? false,  // Added
           questions: campaignData.questions || [],
           settings: campaignData.settings || {
             allowVoice: true,
@@ -43,6 +46,7 @@ export async function POST(request: NextRequest) {
       ])
       .select()
       .single();
+
 
     if (createError) {
       console.error('Error creating campaign:', createError);
