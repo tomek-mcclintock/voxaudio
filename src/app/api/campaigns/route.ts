@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
 
     // Get campaign data from request
     const campaignData = await request.json();
+    console.log('Server received campaign data:', campaignData);  // Add this line
+    console.log('NPS Question received:', campaignData.nps_question);  // Add this line
+
 
     // Create new campaign
         const { data: campaign, error: createError } = await supabase
