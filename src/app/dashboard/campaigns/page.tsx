@@ -64,9 +64,10 @@ export default function CampaignsPage() {
     }
   };
 
-  const copyFeedbackLink = (campaignId: string) => {
-    const link = `${window.location.origin}/feedback?cid=${company.id}&campaign=${campaignId}`;
-    navigator.clipboard.writeText(link);
+  const copyFeedbackLink = async (campaignId: string) => {
+    const baseLink = `${window.location.origin}/feedback?cid=${company.id}&campaign=${campaignId}`;
+    await navigator.clipboard.writeText(baseLink);
+    alert('Feedback link copied to clipboard!');
   };
 
   if (loading) {

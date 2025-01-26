@@ -4,39 +4,46 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import FeedbackForm from '@/components/FeedbackForm';
 import Header from '@/components/Header';
-import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
-
-interface SearchParams {
-  id?: string;
-  cid?: string;
-}
 
 export default async function FeedbackPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: { id?: string; cid?: string; campaign?: string };
 }) {
   const supabase = createServerComponentClient({ cookies });
-  let companyData: CompanyContextType | null = null;
+  let companyData = null;
+  let campaignData = null;
 
   if (searchParams.cid) {
+    // Get company data
     const { data: company } = await supabase
       .from('companies')
       .select('id, name, logo_url, primary_color')
       .eq('id', searchParams.cid)
       .single();
     
-    if (company) {
-      companyData = {
-        id: company.id,
-        name: company.name,
-        logo_url: company.logo_url,
-        primary_color: company.primary_color
-      };
+    companyData = company;
+
+    // If campaign ID is provided, verify it belongs to this company
+    if (searchParams.campaign) {
+      const { data: campaign } = await supabase
+        .from('feedback_campaigns')
+        .select('*')
+        .eq('id', searchParams.campaign)
+        .eq('company_id', searchParams.cid)
+        .single();
+
+      campaignData = campaign;
     }
   }
 
-  if (!searchParams.id || !searchParams.cid || !companyData) {
+  // Check if the link is valid
+  const isValid = 
+    companyData && 
+    (searchParams.campaign ? campaignData : true) && // Campaign check only if campaign ID provided
+    (!searchParams.id || (searchParams.id && searchParams.id.length > 0)); // Order ID check only if provided
+
+  if (!isValid) {
     return (
       <div className="flex items-center justify-center min-h-full p-4">
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
@@ -63,8 +70,9 @@ export default async function FeedbackPage({
             }
           >
             <FeedbackForm 
-              orderId={searchParams.id} 
-              companyId={searchParams.cid}
+              orderId={searchParams.id || ''} 
+              companyId={searchParams.cid || ''}
+              campaignId={searchParams.campaign}
               companyData={companyData}
             />
           </Suspense>

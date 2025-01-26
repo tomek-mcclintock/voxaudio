@@ -7,10 +7,16 @@ import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
 interface FeedbackFormProps {
   orderId: string;
   companyId: string;
+  campaignId?: string;
   companyData: CompanyContextType;
 }
 
-const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId, companyId, companyData }) => {
+const FeedbackForm: React.FC<FeedbackFormProps> = ({ 
+  orderId, 
+  companyId, 
+  campaignId,
+  companyData 
+}) => {
   const [npsScore, setNpsScore] = useState<number | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,6 +24,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId, companyId, company
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
+  const [showOrderInput, setShowOrderInput] = useState(!orderId);
+  const [localOrderId, setLocalOrderId] = useState(orderId);
 
   const handleSubmit = async () => {
     if (!consent) {
@@ -27,6 +35,11 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId, companyId, company
     
     if (!npsScore) {
       setError('Please provide a score');
+      return;
+    }
+
+    if (!localOrderId && showOrderInput) {
+      setError('Please provide an order ID');
       return;
     }
 
@@ -43,8 +56,12 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId, companyId, company
       if (audioBlob) {
         formData.append('audio', audioBlob);
       }
-      formData.append('orderId', orderId);
+      formData.append('orderId', localOrderId);
       formData.append('npsScore', npsScore.toString());
+      formData.append('companyId', companyId);
+      if (campaignId) {
+        formData.append('campaignId', campaignId);
+      }
 
       const response = await fetch('/api/save-feedback', {
         method: 'POST',
@@ -64,6 +81,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId, companyId, company
     }
   };
 
+
   if (submitted) {
     return (
       <div className="text-center p-8">
@@ -76,8 +94,24 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ orderId, companyId, company
   return (
     <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">
-        Share Your Ruggable Experience
+        Share Your {companyData.name} Experience
       </h1>
+
+      {showOrderInput && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Order ID
+          </label>
+          <input
+            type="text"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            value={localOrderId}
+            onChange={(e) => setLocalOrderId(e.target.value)}
+          />
+        </div>
+      )}
+
 
       <div className="mb-8">
         <p className="text-gray-600 mb-4">
