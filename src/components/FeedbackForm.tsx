@@ -1,8 +1,8 @@
-// src/components/FeedbackForm.tsx
 'use client';
 
 import React, { useState, useRef } from 'react';
 import AudioRecorder, { AudioRecorderRef } from './AudioRecorder';
+import { Mic, MessageSquare } from 'lucide-react';
 import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
 
 interface FeedbackFormProps {
@@ -24,6 +24,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<'voice' | 'text'>('voice');
+  const [textFeedback, setTextFeedback] = useState('');
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
   const [showOrderInput, setShowOrderInput] = useState(!orderId);
   const [localOrderId, setLocalOrderId] = useState(orderId);
@@ -44,6 +46,11 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
       return;
     }
 
+    if (feedbackType === 'text' && !textFeedback.trim()) {
+      setError('Please provide your feedback');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -53,8 +60,10 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
       }
 
       const formData = new FormData();
-      if (audioBlob) {
+      if (feedbackType === 'voice' && audioBlob) {
         formData.append('audio', audioBlob);
+      } else if (feedbackType === 'text') {
+        formData.append('textFeedback', textFeedback);
       }
       formData.append('orderId', localOrderId);
       formData.append('npsScore', npsScore.toString());
@@ -143,14 +152,55 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         </div>
       </div>
 
-      <div className="mb-8">
-        <p className="text-gray-600 mb-4">
-          Tell us about your experience (max 5 minutes):
-        </p>
-        <AudioRecorder 
-          onRecordingComplete={setAudioBlob}
-          ref={audioRecorderRef}
-        />
+      <div className="mb-4">
+        <div className="flex justify-center space-x-4 mb-6">
+          <button
+            onClick={() => setFeedbackType('voice')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+              feedbackType === 'voice'
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Mic className="w-5 h-5" />
+            Voice Feedback
+          </button>
+          <button
+            onClick={() => setFeedbackType('text')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+              feedbackType === 'text'
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <MessageSquare className="w-5 h-5" />
+            Text Feedback
+          </button>
+        </div>
+
+        {feedbackType === 'voice' ? (
+          <div>
+            <p className="text-gray-600 mb-4">
+              Tell us about your experience (max 5 minutes):
+            </p>
+            <AudioRecorder 
+              onRecordingComplete={setAudioBlob}
+              ref={audioRecorderRef}
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tell us about your experience:
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 rounded-md h-32"
+              value={textFeedback}
+              onChange={(e) => setTextFeedback(e.target.value)}
+              placeholder="Please share your thoughts..."
+            />
+          </div>
+        )}
       </div>
 
       <div className="mb-8">
@@ -162,7 +212,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
             className="mt-1"
           />
           <span className="text-sm text-gray-600">
-            I consent to {companyData?.name || 'the company'} collecting and processing my voice recording and feedback, 
+            I consent to {companyData?.name || 'the company'} collecting and processing my feedback
+            {feedbackType === 'voice' && ' and voice recording'}, 
             including processing on US-based servers. I understand this data will be used to improve products and services. 
             View our full <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.
           </span>

@@ -1,3 +1,4 @@
+// src/app/api/save-feedback/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { uploadVoiceRecording } from '@/lib/s3';
@@ -15,8 +16,16 @@ export async function POST(request: NextRequest) {
     const companyId = formData.get('companyId') as string;
     const campaignId = formData.get('campaignId') as string;
     const audioFile = formData.get('audio') as Blob | null;
+    const textFeedback = formData.get('textFeedback') as string | null;
 
-    console.log('Received data:', { orderId, npsScore, companyId, campaignId, hasAudio: !!audioFile });
+    console.log('Received data:', { 
+      orderId, 
+      npsScore, 
+      companyId, 
+      campaignId, 
+      hasAudio: !!audioFile,
+      hasText: !!textFeedback 
+    });
 
     if (!orderId || !npsScore || !companyId || !campaignId) {
       console.log('Missing required fields');
@@ -72,6 +81,17 @@ export async function POST(request: NextRequest) {
           { error: 'Failed to process audio' },
           { status: 500 }
         );
+      }
+    } else if (textFeedback) {
+      // Use the text feedback directly
+      transcription = textFeedback;
+      try {
+        console.log('Analyzing text feedback...');
+        const analysis = await analyzeFeedback(textFeedback);
+        sentiment = analysis.sentiment;
+        console.log('Analysis complete:', sentiment);
+      } catch (error) {
+        console.error('Error analyzing text:', error);
       }
     }
 
