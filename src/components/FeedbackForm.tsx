@@ -1,3 +1,4 @@
+// src/components/FeedbackForm.tsx
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -8,7 +9,7 @@ interface FeedbackFormProps {
   orderId: string;
   companyId: string;
   campaignId?: string;
-  companyData: CompanyContextType;
+  companyData: CompanyContextType | null;
 }
 
 const FeedbackForm: React.FC<FeedbackFormProps> = ({ 
@@ -47,7 +48,6 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     setError(null);
 
     try {
-      // Stop recording if active
       if (audioRecorderRef.current) {
         audioRecorderRef.current.stopRecording();
       }
@@ -81,7 +81,6 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     }
   };
 
-
   if (submitted) {
     return (
       <div className="text-center p-8">
@@ -94,7 +93,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
   return (
     <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">
-        Share Your {companyData.name} Experience
+        Share Your {companyData?.name || 'Experience'}
       </h1>
 
       {showOrderInput && (
@@ -112,10 +111,9 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         </div>
       )}
 
-
       <div className="mb-8">
         <p className="text-gray-600 mb-4">
-          How likely are you to recommend Ruggable to friends and family?
+          How likely are you to recommend {companyData?.name || 'us'} to friends and family?
         </p>
         <div className="flex justify-between gap-1">
           {[...Array(10)].map((_, i) => {
@@ -164,8 +162,10 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
             className="mt-1"
           />
           <span className="text-sm text-gray-600">
-          I consent to Ruggable collecting and processing my voice recording and feedback, including processing on US-based servers. 
-          I understand this data will be used to improve products and services. View our full <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.          </span>
+            I consent to {companyData?.name || 'the company'} collecting and processing my voice recording and feedback, 
+            including processing on US-based servers. I understand this data will be used to improve products and services. 
+            View our full <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.
+          </span>
         </label>
       </div>
 

@@ -26,7 +26,7 @@ export default function Header({ companyData }: HeaderProps) {
               </div>
             ) : (
               <div className="text-xl font-semibold">
-                {companyData?.name || 'Company Feedback'}
+                {companyData?.name || 'Feedback'}
               </div>
             )}
           </div>
