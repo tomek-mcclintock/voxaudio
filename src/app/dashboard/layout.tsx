@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { CompanyProvider, CompanyContextType } from '@/lib/contexts/CompanyContext';
 import { redirect } from 'next/navigation';
+import DashboardNav from '@/components/DashboardNav';
 
 export default async function DashboardLayout({
   children,
@@ -50,7 +51,20 @@ export default async function DashboardLayout({
 
   return (
     <CompanyProvider company={company}>
-      {children}
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-xl font-semibold text-gray-900">{company.name}</h1>
+              <div className="flex items-center">
+                {/* Add user menu here later */}
+              </div>
+            </div>
+          </div>
+        </header>
+        <DashboardNav />
+        <main>{children}</main>
+      </div>
     </CompanyProvider>
   );
 }

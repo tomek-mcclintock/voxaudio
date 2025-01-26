@@ -13,14 +13,31 @@ export async function POST(request: NextRequest) {
     const orderId = formData.get('orderId') as string;
     const npsScore = parseInt(formData.get('npsScore') as string);
     const companyId = formData.get('companyId') as string;
+    const campaignId = formData.get('campaignId') as string;
     const audioFile = formData.get('audio') as Blob | null;
 
-    console.log('Received data:', { orderId, npsScore, companyId, hasAudio: !!audioFile });
+    console.log('Received data:', { orderId, npsScore, companyId, campaignId, hasAudio: !!audioFile });
 
-    if (!orderId || !npsScore || !companyId) {
+    if (!orderId || !npsScore || !companyId || !campaignId) {
       console.log('Missing required fields');
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Validate campaign exists and belongs to company
+    const { data: campaign, error: campaignError } = await supabase
+      .from('feedback_campaigns')
+      .select('id')
+      .eq('id', campaignId)
+      .eq('company_id', companyId)
+      .single();
+
+    if (campaignError || !campaign) {
+      console.error('Invalid campaign:', campaignError);
+      return NextResponse.json(
+        { error: 'Invalid campaign' },
         { status: 400 }
       );
     }
@@ -36,7 +53,7 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(arrayBuffer);
 
         console.log('Uploading to S3...');
-        voiceFileUrl = await uploadVoiceRecording(buffer, `${companyId}/${orderId}`);
+        voiceFileUrl = await uploadVoiceRecording(buffer, `${companyId}/${campaignId}/${orderId}`);
         console.log('S3 upload complete:', voiceFileUrl);
 
         console.log('Transcribing audio...');
@@ -63,6 +80,7 @@ export async function POST(request: NextRequest) {
       .from('feedback_submissions')
       .insert({
         company_id: companyId,
+        campaign_id: campaignId,
         order_id: orderId,
         nps_score: npsScore,
         voice_file_url: voiceFileUrl,
