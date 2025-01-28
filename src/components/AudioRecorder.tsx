@@ -59,7 +59,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       const barWidth = canvas.width / 50;
       const heightMultiplier = canvas.height / 255;
       
-      ctx.fillStyle = '#657567'; // Ruggable primary color
+      ctx.fillStyle = '#657567'; // Sage color
       
       for (let i = 0; i < 50; i++) {
         const value = dataArray[i * 2];
@@ -186,7 +186,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
           {!isRecording && !audioBlob ? (
             <button
               onClick={startRecording}
-              className="p-4 rounded-full bg-[#934b32] hover:bg-[#833f2a] transition-colors duration-200"
+              className="p-4 rounded-full bg-[#657567] hover:bg-[#4d594d] transition-colors duration-200"
               aria-label="Start recording"
             >
               <Mic className="w-8 h-8 text-white" />

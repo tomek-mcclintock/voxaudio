@@ -35,7 +35,7 @@ const Button: React.FC<ButtonProps> = ({
   const baseStyles = 'px-4 py-3 rounded-lg font-manrope font-semibold transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-[#934b32] hover:bg-[#833f2a] text-white',
+    primary: 'bg-[#657567] hover:bg-[#4d594d] text-white',
     secondary: 'bg-[#657567] hover:bg-[#4d594d] text-white',
     outline: 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50',
   };
@@ -97,7 +97,6 @@ export default function FeedbackForm({
       return;
     }
 
-    // Validate required questions
     if (campaignData?.include_additional_questions) {
       const missingRequired = campaignData.questions.some(
         q => q.required && !questionResponses[q.id]
@@ -194,25 +193,21 @@ export default function FeedbackForm({
             {[...Array(10)].map((_, i) => {
               const score = i + 1;
               const getScoreColor = (score: number) => {
-                if (score <= 6) {
-                  return npsScore === null
-                    ? 'bg-red-500 text-white hover:bg-red-600'
-                    : npsScore === score
-                    ? 'bg-red-500 text-white ring-2 ring-red-500 ring-offset-2'
-                    : 'bg-red-200 text-red-700 opacity-60';
-                }
-                if (score <= 8) {
-                  return npsScore === null
-                    ? 'bg-yellow-500 text-white hover:bg-yellow-600'
-                    : npsScore === score
-                    ? 'bg-yellow-500 text-white ring-2 ring-yellow-500 ring-offset-2'
-                    : 'bg-yellow-200 text-yellow-700 opacity-60';
-                }
-                return npsScore === null
-                  ? 'bg-green-500 text-white hover:bg-green-600'
+                if (score <= 6) return npsScore === null
+                  ? 'bg-red-500 text-white hover:bg-red-600'
                   : npsScore === score
-                  ? 'bg-green-500 text-white ring-2 ring-green-500 ring-offset-2'
-                  : 'bg-green-200 text-green-700 opacity-60';
+                  ? 'bg-red-500 text-white ring-2 ring-red-500 ring-offset-2'
+                  : 'bg-red-200 text-red-700 opacity-75';
+                if (score <= 8) return npsScore === null
+                  ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                  : npsScore === score
+                  ? 'bg-yellow-500 text-white ring-2 ring-yellow-500 ring-offset-2'
+                  : 'bg-yellow-200 text-yellow-700 opacity-75';
+                return npsScore === null
+                  ? 'bg-[#657567] text-white hover:bg-[#4d594d]'
+                  : npsScore === score
+                  ? 'bg-[#657567] text-white ring-2 ring-[#657567] ring-offset-2'
+                  : 'bg-[#a3b0a3] text-white opacity-75';
               };
 
               return (
@@ -245,7 +240,7 @@ export default function FeedbackForm({
               onClick={() => setFeedbackType('voice')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 
                 ${feedbackType === 'voice'
-                  ? 'bg-[#934b32] text-white'
+                  ? 'bg-[#657567] text-white'
                   : 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50'
                 }`}
             >
@@ -256,7 +251,7 @@ export default function FeedbackForm({
               onClick={() => setFeedbackType('text')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
                 ${feedbackType === 'text'
-                  ? 'bg-[#934b32] text-white'
+                  ? 'bg-[#657567] text-white'
                   : 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50'
                 }`}
             >
@@ -314,7 +309,7 @@ export default function FeedbackForm({
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full bg-[#934b32] hover:bg-[#833f2a] disabled:bg-gray-300 disabled:cursor-not-allowed 
+          className="w-full bg-[#657567] hover:bg-[#4d594d] disabled:bg-gray-300 disabled:cursor-not-allowed 
                    text-white font-manrope font-semibold py-3 px-4 rounded-lg 
                    flex items-center justify-center gap-2 transition-colors duration-200"
         >
