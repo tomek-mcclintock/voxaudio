@@ -39,6 +39,16 @@ interface DashboardData {
   recentFeedback: FeedbackEntry[];
 }
 
+interface FeedbackExcelData {
+  'Date': string;
+  'Campaign': string;
+  'Order ID': string;
+  'NPS Score': number;
+  'Has Voice Recording': string;
+  'Feedback': string;
+  [key: string]: string | number; // This allows dynamic property names
+}
+
 export default function DashboardPage() {
   const company = useCompany();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -118,7 +128,7 @@ export default function DashboardPage() {
       );
 
       // Base feedback data
-      const baseData = {
+      const baseData: FeedbackExcelData = {
         'Date': new Date(feedback.created_at).toLocaleDateString(),
         'Campaign': feedback.feedback_campaigns.name,
         'Order ID': feedback.order_id,
