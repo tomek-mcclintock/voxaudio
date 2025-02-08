@@ -75,13 +75,21 @@ export default function FeedbackForm({
   const [localOrderId, setLocalOrderId] = useState(orderId);
 
   const handleQuestionResponse = (questionId: string, value: any) => {
-    setQuestionResponses(prev => ({
-      ...prev,
-      [questionId]: value
-    }));
+    console.log(`Setting response for question ${questionId}:`, value);
+    setQuestionResponses(prev => {
+      const updated = {
+        ...prev,
+        [questionId]: value
+      };
+      console.log("Updated questionResponses:", updated);
+      return updated;
+    });
   };
+  
 
   const handleSubmit = async () => {
+    console.log("Starting submission with questionResponses:", questionResponses);
+    console.log("Campaign Data:", campaignData);  
     if (!consent) {
       setError('Please accept the consent notice to submit feedback');
       return;

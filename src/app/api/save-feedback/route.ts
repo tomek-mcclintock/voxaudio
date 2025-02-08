@@ -12,6 +12,13 @@ export async function POST(request: NextRequest) {
     console.log('Starting feedback submission...');
     
     const formData = await request.formData();
+    
+    // Log all FormData entries
+    console.log('Raw FormData entries:');
+    for (const pair of formData.entries()) {
+      console.log(pair[0], ':', pair[1]);
+    }
+
     const orderId = formData.get('orderId') as string;
     const npsScore = formData.get('npsScore') ? parseInt(formData.get('npsScore') as string) : null;
     const companyId = formData.get('companyId') as string;
@@ -20,26 +27,28 @@ export async function POST(request: NextRequest) {
     const textFeedback = formData.get('textFeedback') as string | null;
     const questionResponsesStr = formData.get('questionResponses') as string | null;
 
-    console.log('Received question responses string:', questionResponsesStr);
+    console.log('Raw questionResponsesStr:', questionResponsesStr);
 
     let questionResponses = null;
     if (questionResponsesStr) {
       try {
         questionResponses = JSON.parse(questionResponsesStr);
-        console.log('Parsed question responses:', questionResponses);
+        console.log('Parsed questionResponses:', questionResponses);
       } catch (e) {
-        console.error('Error parsing question responses:', e);
+        console.error('Failed to parse questionResponses:', e);
+        console.error('Parse error details:', e);
       }
     }
 
-    console.log('Received data:', { 
+    console.log('Processed form data:', { 
       orderId, 
       npsScore, 
       companyId, 
       campaignId, 
       hasAudio: !!audioFile,
       hasText: !!textFeedback,
-      hasQuestionResponses: !!questionResponses
+      hasQuestionResponses: !!questionResponses,
+      questionResponses
     });
 
     if (!orderId || !companyId || !campaignId) {
@@ -109,7 +118,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Start a database transaction
+    // Save feedback submission
+    console.log('Saving feedback submission...');
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .insert({
@@ -126,39 +136,43 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (feedbackError) {
-      console.error('Database error:', feedbackError);
+      console.error('Database error saving feedback:', feedbackError);
       return NextResponse.json(
         { error: 'Failed to save feedback' },
         { status: 500 }
       );
     }
 
+    console.log('Feedback saved successfully:', feedback);
+
     // Save question responses if any
     if (questionResponses && feedback) {
-      console.log('Preparing to save question responses for feedback ID:', feedback.id);
+      console.log('About to save question responses. Feedback ID:', feedback.id);
       
-      const questionResponsesArray = Object.entries(questionResponses).map(([questionId, value]) => {
-        const formattedResponse = {
-          feedback_submission_id: feedback.id,
-          question_id: questionId,
-          response_value: typeof value === 'string' ? value : JSON.stringify(value)
-        };
-        console.log('Formatted response:', formattedResponse);
-        return formattedResponse;
-      });
+      // Format responses for insertion
+      const questionResponsesArray = Object.entries(questionResponses).map(([questionId, value]) => ({
+        feedback_submission_id: feedback.id,
+        question_id: questionId,
+        response_value: typeof value === 'string' ? value : JSON.stringify(value)
+      }));
 
-      console.log('Question responses array to insert:', questionResponsesArray);
+      console.log('Formatted responses for insertion:', questionResponsesArray);
 
-      const { data: insertedResponses, error: responsesError } = await supabase
+      // Attempt to save responses
+      const { data: savedResponses, error: responsesError } = await supabase
         .from('question_responses')
         .insert(questionResponsesArray)
         .select();
 
       if (responsesError) {
-        console.error('Error saving question responses:', responsesError);
+        console.error('Failed to save question responses:', responsesError);
+        console.error('Error details:', responsesError.details);
+        console.error('Error message:', responsesError.message);
       } else {
-        console.log('Successfully saved question responses:', insertedResponses);
+        console.log('Successfully saved responses:', savedResponses);
       }
+    } else {
+      console.log('No question responses to save or no feedback ID available');
     }
 
     // Check for Google Sheets connection and sync if exists
@@ -195,8 +209,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('Feedback submission complete');
-    return NextResponse.json({ success: true });
+    console.log('Feedback submission process complete');
+    return NextResponse.json({ 
+      success: true,
+      feedback,
+      hasQuestionResponses: !!questionResponses
+    });
   } catch (error) {
     console.error('Error processing feedback:', error);
     return NextResponse.json(
