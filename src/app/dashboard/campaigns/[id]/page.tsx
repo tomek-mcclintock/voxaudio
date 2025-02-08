@@ -6,6 +6,7 @@ import { useCompany } from '@/lib/contexts/CompanyContext';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import GoogleSheetsConnect from '@/components/GoogleSheetsConnect';
 
 interface CampaignData {
   id: string;
@@ -122,6 +123,14 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
             {campaign.active ? 'Active' : 'Inactive'}
           </span>
         </div>
+      </div>
+
+      {/* Google Sheets Integration Section */}
+      <div className="mb-8">
+        <GoogleSheetsConnect 
+          campaignId={params.id}
+          onConnect={fetchCampaignData}
+        />
       </div>
 
       {stats && (

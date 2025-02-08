@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { uploadVoiceRecording } from '@/lib/s3';
 import { transcribeAudio, analyzeFeedback } from '@/lib/openai';
+import { appendToSheet, formatFeedbackForSheets } from '@/lib/googleSheets';
 
 export const runtime = 'nodejs';
 
@@ -137,6 +138,40 @@ export async function POST(request: NextRequest) {
         console.error('Error saving question responses:', responsesError);
         // Don't fail the whole submission if question responses fail
         // but log it for monitoring
+      }
+    }
+
+    // Check for Google Sheets connection and sync if exists
+    console.log('Checking for Google Sheets connection...');
+    const { data: sheetsConnection } = await supabase
+      .from('google_sheets_connections')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .single();
+
+    if (sheetsConnection) {
+      console.log('Found Google Sheets connection, syncing data...');
+      try {
+        const formattedData = formatFeedbackForSheets({
+          created_at: feedback.created_at,
+          order_id: orderId,
+          nps_score: npsScore,
+          transcription: transcription,
+          sentiment: sentiment,
+          ...questionResponses && { responses: JSON.stringify(questionResponses) }
+        });
+
+        await appendToSheet(
+          sheetsConnection.refresh_token,
+          sheetsConnection.spreadsheet_id,
+          sheetsConnection.sheet_name,
+          formattedData
+        );
+
+        console.log('Successfully synced to Google Sheets');
+      } catch (error) {
+        console.error('Error syncing to Google Sheets:', error);
+        // Don't fail the submission if Google Sheets sync fails
       }
     }
 
