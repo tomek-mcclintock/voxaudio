@@ -19,7 +19,18 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get('audio') as Blob | null;
     const textFeedback = formData.get('textFeedback') as string | null;
     const questionResponsesStr = formData.get('questionResponses') as string | null;
-    const questionResponses = questionResponsesStr ? JSON.parse(questionResponsesStr) : null;
+
+    console.log('Received question responses string:', questionResponsesStr);
+
+    let questionResponses = null;
+    if (questionResponsesStr) {
+      try {
+        questionResponses = JSON.parse(questionResponsesStr);
+        console.log('Parsed question responses:', questionResponses);
+      } catch (e) {
+        console.error('Error parsing question responses:', e);
+      }
+    }
 
     console.log('Received data:', { 
       orderId, 
@@ -124,20 +135,29 @@ export async function POST(request: NextRequest) {
 
     // Save question responses if any
     if (questionResponses && feedback) {
-      const questionResponsesArray = Object.entries(questionResponses).map(([questionId, value]) => ({
-        feedback_submission_id: feedback.id,
-        question_id: questionId,
-        response_value: typeof value === 'string' ? value : JSON.stringify(value)
-      }));
+      console.log('Preparing to save question responses for feedback ID:', feedback.id);
+      
+      const questionResponsesArray = Object.entries(questionResponses).map(([questionId, value]) => {
+        const formattedResponse = {
+          feedback_submission_id: feedback.id,
+          question_id: questionId,
+          response_value: typeof value === 'string' ? value : JSON.stringify(value)
+        };
+        console.log('Formatted response:', formattedResponse);
+        return formattedResponse;
+      });
 
-      const { error: responsesError } = await supabase
+      console.log('Question responses array to insert:', questionResponsesArray);
+
+      const { data: insertedResponses, error: responsesError } = await supabase
         .from('question_responses')
-        .insert(questionResponsesArray);
+        .insert(questionResponsesArray)
+        .select();
 
       if (responsesError) {
         console.error('Error saving question responses:', responsesError);
-        // Don't fail the whole submission if question responses fail
-        // but log it for monitoring
+      } else {
+        console.log('Successfully saved question responses:', insertedResponses);
       }
     }
 

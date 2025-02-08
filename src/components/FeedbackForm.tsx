@@ -86,7 +86,7 @@ export default function FeedbackForm({
       setError('Please accept the consent notice to submit feedback');
       return;
     }
-
+  
     if (campaignData?.include_nps && !npsScore) {
       setError('Please provide an NPS score');
       return;
@@ -96,26 +96,26 @@ export default function FeedbackForm({
       setError('Please provide an order ID');
       return;
     }
-
+  
     if (campaignData?.include_additional_questions) {
       const missingRequired = campaignData.questions.some(
         q => q.required && !questionResponses[q.id]
       );
-
+  
       if (missingRequired) {
         setError('Please answer all required questions');
         return;
       }
     }
-
+  
     setIsSubmitting(true);
     setError(null);
-
+  
     try {
       if (audioRecorderRef.current) {
         audioRecorderRef.current.stopRecording();
       }
-
+  
       const formData = new FormData();
       if (feedbackType === 'voice' && audioBlob) {
         formData.append('audio', audioBlob);
@@ -131,27 +131,42 @@ export default function FeedbackForm({
       if (campaignData?.include_nps && npsScore) {
         formData.append('npsScore', npsScore.toString());
       }
+  
+      // Log question responses before submission
+      console.log('Question responses before submission:', questionResponses);
+      
       if (Object.keys(questionResponses).length > 0) {
-        formData.append('questionResponses', JSON.stringify(questionResponses));
+        const responsesJson = JSON.stringify(questionResponses);
+        console.log('Stringified responses:', responsesJson);
+        formData.append('questionResponses', responsesJson);
       }
-
+  
+      // Log entire FormData
+      for (let pair of formData.entries()) {
+        console.log('FormData entry:', pair[0], pair[1]);
+      }
+  
       const response = await fetch('/api/save-feedback', {
         method: 'POST',
         body: formData,
       });
-
+  
       if (!response.ok) {
         throw new Error('Failed to submit feedback');
       }
-
+  
+      const result = await response.json();
+      console.log('Submission response:', result);
+  
       setSubmitted(true);
     } catch (err) {
-      setError('Failed to submit feedback. Please try again.');
       console.error('Submission error:', err);
+      setError('Failed to submit feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
+  
 
   if (submitted) {
     return (
