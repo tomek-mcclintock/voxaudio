@@ -1,3 +1,4 @@
+// src/app/api/dashboard/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -10,11 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
-    // Get current user's session
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError) throw authError;
 
-    // Get user's company_id
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('company_id')
@@ -25,10 +24,31 @@ export async function GET(request: NextRequest) {
 
     const companyId = userData.company_id;
     const now = new Date().toISOString();
-    
-    console.log('Fetching dashboard data for company:', companyId);
-    
-    // Fetch last 30 days of summaries for this company
+
+    // Fetch feedback with question responses
+    const { data: feedback, error: feedbackError } = await supabase
+      .from('feedback_submissions')
+      .select(`
+        *,
+        feedback_campaigns!inner (
+          name,
+          questions
+        ),
+        question_responses (
+          question_id,
+          response_value
+        )
+      `)
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .lte('created_at', now);
+
+    if (feedbackError) {
+      throw feedbackError;
+    }
+
+    // Fetch summaries
     const { data: summaries, error: summariesError } = await supabase
       .from('daily_summaries')
       .select('*')
@@ -38,25 +58,9 @@ export async function GET(request: NextRequest) {
       .lte('created_at', now);
 
     if (summariesError) {
-      console.error('Summaries error:', summariesError);
       throw summariesError;
     }
 
-    // Fetch recent feedback for this company
-    const { data: feedback, error: feedbackError } = await supabase
-      .from('feedback_submissions')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
-      .limit(10)
-      .lte('created_at', now);
-
-    if (feedbackError) {
-      console.error('Feedback error:', feedbackError);
-      throw feedbackError;
-    }
-
-    // Add cache control headers
     const headers = new Headers({
       'Cache-Control': 'no-store, must-revalidate',
       'Pragma': 'no-cache',

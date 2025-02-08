@@ -14,11 +14,24 @@ interface DailySummary {
 }
 
 interface FeedbackEntry {
+  id: string;
   created_at: string;
   order_id: string;
   nps_score: number;
   transcription: string | null;
   voice_file_url: string | null;
+  feedback_campaigns: {
+    name: string;
+    questions: Array<{
+      id: string;
+      text: string;
+      type: string;
+    }>;
+  };
+  question_responses: Array<{
+    question_id: string;
+    response_value: string;
+  }>;
 }
 
 interface DashboardData {
@@ -27,54 +40,48 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-    const company = useCompany();
-    const [data, setData] = useState<DashboardData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [analysisRunning, setAnalysisRunning] = useState(false);
-  
-    const fetchDashboardData = async () => {
-      try {
-        const timestamp = new Date().getTime();
-        const response = await fetch(`/api/dashboard?timestamp=${timestamp}`, {
-          cache: 'no-store',
-          next: { revalidate: 0 },
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard data');
+  const company = useCompany();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
+
+  const fetchDashboardData = async () => {
+    try {
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/dashboard?timestamp=${timestamp}`, {
+        cache: 'no-store',
+        next: { revalidate: 0 },
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
         }
-  
-        const result = await response.json();
-        console.log('Dashboard data fetched at:', new Date().toISOString(), result);
-        
-        if (result.error) {
-          throw new Error(result.error);
-        }
-  
-        setData(result);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-      } finally {
-        setLoading(false);
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
       }
-    };  
+
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setData(result);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchDashboardData();
-
-    // Set up auto-refresh every 30 seconds
     const intervalId = setInterval(fetchDashboardData, 30000);
-
-    // Cleanup interval on component unmount
     return () => clearInterval(intervalId);
   }, []);
-
 
   const runAnalysis = async () => {
     try {
@@ -101,13 +108,32 @@ export default function DashboardPage() {
     const { recentFeedback, dailySummaries } = data;
 
     // Prepare feedback data
-    const feedbackData = recentFeedback.map(feedback => ({
-      'Date': new Date(feedback.created_at).toLocaleDateString(),
-      'Order ID': feedback.order_id,
-      'NPS Score': feedback.nps_score,
-      'Has Voice Recording': feedback.voice_file_url ? 'Yes' : 'No',
-      'Transcription': feedback.transcription || 'No transcription',
-    }));
+    const feedbackData = recentFeedback.map(feedback => {
+      // Get the questions from the campaign
+      const campaignQuestions = feedback.feedback_campaigns.questions || [];
+      
+      // Create a map of question responses
+      const responseMap = new Map(
+        feedback.question_responses.map((r) => [r.question_id, r.response_value])
+      );
+
+      // Base feedback data
+      const baseData = {
+        'Date': new Date(feedback.created_at).toLocaleDateString(),
+        'Campaign': feedback.feedback_campaigns.name,
+        'Order ID': feedback.order_id,
+        'NPS Score': feedback.nps_score,
+        'Has Voice Recording': feedback.voice_file_url ? 'Yes' : 'No',
+        'Feedback': feedback.transcription || '',
+      };
+
+      // Add question responses
+      campaignQuestions.forEach((question) => {
+        baseData[`Q: ${question.text}`] = responseMap.get(question.id) || '';
+      });
+
+      return baseData;
+    });
 
     // Prepare summaries data
     const summariesData = dailySummaries.map(summary => ({
@@ -128,7 +154,7 @@ export default function DashboardPage() {
     XLSX.utils.book_append_sheet(wb, summariesSheet, "Daily Summaries");
 
     // Generate Excel file
-    XLSX.writeFile(wb, `ruggable-feedback-${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `feedback-export-${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   if (loading) {
@@ -228,7 +254,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Latest Feedback */}
+      {/* Latest Feedback Table */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Latest Feedback</h2>
@@ -238,42 +264,67 @@ export default function DashboardPage() {
             <thead>
               <tr className="border-b">
                 <th className="text-left py-3 px-4">Date</th>
+                <th className="text-left py-3 px-4">Campaign</th>
                 <th className="text-left py-3 px-4">Order ID</th>
                 <th className="text-left py-3 px-4">NPS Score</th>
                 <th className="text-left py-3 px-4">Feedback</th>
+                <th className="text-left py-3 px-4">Responses</th>
               </tr>
             </thead>
             <tbody>
-              {recentFeedback.map((feedback) => (
-                <tr key={feedback.order_id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    {new Date(feedback.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="py-3 px-4">{feedback.order_id}</td>
-                  <td className="py-3 px-4">
-                    <span 
-                      className={`px-2 py-1 rounded ${
+              {recentFeedback.map((feedback) => {
+                // Get questions from the campaign
+                const campaignQuestions = feedback.feedback_campaigns.questions || [];
+                
+                // Create a map of question responses
+                const responseMap = new Map(
+                  feedback.question_responses.map((r) => [r.question_id, r.response_value])
+                );
+
+                return (
+                  <tr key={feedback.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4">
+                      {new Date(feedback.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 px-4">
+                      {feedback.feedback_campaigns.name}
+                    </td>
+                    <td className="py-3 px-4">{feedback.order_id}</td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-1 rounded ${
                         feedback.nps_score >= 9 ? 'bg-green-100 text-green-800' :
                         feedback.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
                         'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {feedback.nps_score}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    {feedback.transcription ? (
-                      <span>{feedback.transcription.slice(0, 100)}{feedback.transcription.length > 100 ? '...' : ''}</span>
-                    ) : (
-                      feedback.voice_file_url ? (
-                        <span className="text-blue-600">Has voice recording</span>
+                      }`}>
+                        {feedback.nps_score}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      {feedback.transcription ? (
+                        <span>{feedback.transcription.slice(0, 100)}{feedback.transcription.length > 100 ? '...' : ''}</span>
                       ) : (
-                        <span className="text-gray-400">No feedback provided</span>
-                      )
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        feedback.voice_file_url ? (
+                          <span className="text-blue-600">Has voice recording</span>
+                        ) : (
+                          <span className="text-gray-400">No feedback provided</span>
+                        )
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="space-y-1">
+                        {campaignQuestions.map((question) => (
+                          <div key={question.id} className="text-sm">
+                            <span className="font-medium">{question.text}:</span>{' '}
+                            <span className="text-gray-600">
+                              {responseMap.get(question.id) || 'No response'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
