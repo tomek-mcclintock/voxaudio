@@ -1,3 +1,4 @@
+// src/app/api/campaigns/details/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -26,7 +27,10 @@ export async function GET(
     // Get campaign details
     const { data: campaign, error: campaignError } = await supabase
       .from('feedback_campaigns')
-      .select('*')
+      .select(`
+        *,
+        questions
+      `)
       .eq('id', params.id)
       .eq('company_id', userData.company_id)
       .single();
@@ -36,10 +40,18 @@ export async function GET(
       throw campaignError;
     }
 
+    console.log('Retrieved campaign:', campaign);
+
     // Get feedback for this campaign
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedback_submissions')
-      .select('created_at, nps_score, transcription, sentiment')
+      .select(`
+        created_at,
+        nps_score,
+        transcription,
+        sentiment,
+        question_responses (*)
+      `)
       .eq('campaign_id', params.id)
       .eq('company_id', userData.company_id)
       .order('created_at', { ascending: false });

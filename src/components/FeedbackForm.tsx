@@ -231,6 +231,54 @@ export default function FeedbackForm({
         </div>
       )}
 
+{/* Additional Questions Section */}
+{campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (
+  <div className="space-y-6 mb-8">
+    <h3 className="font-manrope font-semibold text-gray-700">Additional Questions</h3>
+    {campaignData.questions.map((question: CampaignQuestion) => (
+      <div key={question.id} className="space-y-2">
+        <label className="block font-manrope text-gray-700">
+          {question.text}
+          {question.required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        
+        {question.type === 'text' && (
+          <TextQuestion
+            question={question}
+            value={questionResponses[question.id] || ''}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+        
+        {question.type === 'rating' && (
+          <RatingQuestion
+            question={question}
+            value={questionResponses[question.id] || null}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+        
+        {question.type === 'multiple_choice' && (
+          <MultipleChoiceQuestion
+            question={question}
+            value={questionResponses[question.id] || ''}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+        
+        {question.type === 'yes_no' && (
+          <YesNoQuestion
+            question={question}
+            value={questionResponses[question.id] || ''}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+      </div>
+    ))}
+  </div>
+)}
+
+
       {/* Voice/Text Feedback Section */}
       <div className="space-y-4 mb-8">
         <p className="font-manrope font-semibold text-gray-700">Additional feedback:</p>

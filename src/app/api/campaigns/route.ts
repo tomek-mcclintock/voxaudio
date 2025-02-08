@@ -22,12 +22,10 @@ export async function POST(request: NextRequest) {
 
     // Get campaign data from request
     const campaignData = await request.json();
-    console.log('Server received campaign data:', campaignData);  // Add this line
-    console.log('NPS Question received:', campaignData.nps_question);  // Add this line
-
+    console.log('Server received campaign data:', campaignData);
 
     // Create new campaign
-        const { data: campaign, error: createError } = await supabase
+    const { data: campaign, error: createError } = await supabase
       .from('feedback_campaigns')
       .insert([
         {
@@ -35,10 +33,10 @@ export async function POST(request: NextRequest) {
           name: campaignData.name,
           start_date: campaignData.start_date || null,
           end_date: campaignData.end_date || null,
-          include_nps: campaignData.include_nps ?? true,  // Added
-          nps_question: campaignData.nps_question || null,  // Added
-          include_additional_questions: campaignData.include_additional_questions ?? false,  // Added
-          questions: campaignData.questions || [],
+          include_nps: campaignData.include_nps ?? true,
+          nps_question: campaignData.nps_question || null,
+          include_additional_questions: campaignData.include_additional_questions ?? false,
+          questions: campaignData.include_additional_questions ? campaignData.questions : [],
           settings: campaignData.settings || {
             allowVoice: true,
             allowText: true,
@@ -50,12 +48,12 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-
     if (createError) {
       console.error('Error creating campaign:', createError);
       throw createError;
     }
 
+    console.log('Created campaign:', campaign);
     return NextResponse.json({ campaign });
 
   } catch (error) {
@@ -66,6 +64,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 export async function GET(request: NextRequest) {
   try {
