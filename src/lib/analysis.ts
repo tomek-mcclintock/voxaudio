@@ -1,3 +1,4 @@
+// src/lib/analysis.ts
 import { supabase } from './supabase';
 import OpenAI from 'openai';
 
@@ -7,31 +8,33 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function generateDailySummary(companyId: string) {
+export async function generateDailySummary(companyId: string, dateStr?: string) {
   try {
-    console.log('Starting daily summary generation for company:', companyId);
+    console.log(`Starting daily summary generation for company: ${companyId}, date: ${dateStr || 'today'}`);
     
-    // Get today's date range
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // Fetch today's feedback for this company
+    // Get the date range for the specified date or today
+    const targetDate = dateStr ? new Date(dateStr) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
+    
+    // For a 30-day rolling NPS, get feedback from the 30 days prior
+    const thirtyDaysAgo = new Date(targetDate);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    // Fetch feedback for the 30-day period for this company
     console.log('Fetching feedback...');
     const { data: feedbackEntries, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .select('*')
       .eq('company_id', companyId)
-      .gte('created_at', today.toISOString())
-      .lt('created_at', tomorrow.toISOString());
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .lt('created_at', targetDate.toISOString());
 
     if (feedbackError) {
       console.error('Error fetching feedback:', feedbackError);
       throw feedbackError;
     }
 
-    console.log(`Found ${feedbackEntries?.length || 0} feedback entries`);
+    console.log(`Found ${feedbackEntries?.length || 0} feedback entries for the 30-day period`);
 
     if (!feedbackEntries?.length) {
       return {
@@ -42,8 +45,15 @@ export async function generateDailySummary(companyId: string) {
       };
     }
 
-    // Calculate NPS average
-    const npsAverage = feedbackEntries.reduce((acc, entry) => acc + entry.nps_score, 0) / feedbackEntries.length;
+    // Calculate proper NPS
+    const promoters = feedbackEntries.filter(entry => entry.nps_score >= 9).length;
+    const detractors = feedbackEntries.filter(entry => entry.nps_score <= 6).length;
+    const total = feedbackEntries.length;
+    
+    // Calculate percentages and NPS
+    const promoterPercentage = (promoters / total) * 100;
+    const detractorPercentage = (detractors / total) * 100;
+    const npsScore = promoterPercentage - detractorPercentage;
 
     // Compile all transcriptions
     const transcriptions = feedbackEntries
@@ -53,10 +63,10 @@ export async function generateDailySummary(companyId: string) {
 
     if (!transcriptions) {
       return {
-        npsAverage,
+        npsAverage: npsScore,
         positiveThemes: [],
         negativeThemes: [],
-        summary: `Average NPS: ${npsAverage.toFixed(1)}. No voice feedback received.`,
+        summary: `NPS Score: ${npsScore.toFixed(1)}. No voice feedback received for analysis.`,
       };
     }
 
@@ -93,7 +103,7 @@ export async function generateDailySummary(companyId: string) {
     }
 
     return {
-      npsAverage,
+      npsAverage: npsScore, // Using existing field name but storing correct NPS
       ...analysis
     };
   } catch (error) {
@@ -139,24 +149,43 @@ export async function generateMonthlySummary(companyId: string) {
       };
     }
 
-    // Calculate NPS average
-    const npsAverage = feedbackEntries.reduce((acc, entry) => acc + entry.nps_score, 0) / feedbackEntries.length;
+    // Calculate proper NPS
+    const promoters = feedbackEntries.filter(entry => entry.nps_score >= 9).length;
+    const detractors = feedbackEntries.filter(entry => entry.nps_score <= 6).length;
+    const total = feedbackEntries.length;
+    
+    // Calculate percentages and NPS
+    const promoterPercentage = (promoters / total) * 100;
+    const detractorPercentage = (detractors / total) * 100;
+    const npsScore = promoterPercentage - detractorPercentage;
 
     // Calculate daily scores for trend
     const dailyScores = new Map();
     feedbackEntries.forEach(entry => {
       const date = entry.created_at.split('T')[0];
       if (!dailyScores.has(date)) {
-        dailyScores.set(date, { total: 0, count: 0 });
+        dailyScores.set(date, { promoters: 0, passives: 0, detractors: 0, total: 0 });
       }
       const day = dailyScores.get(date);
-      day.total += entry.nps_score;
-      day.count += 1;
+      day.total += 1;
+      
+      if (entry.nps_score >= 9) {
+        day.promoters += 1;
+      } else if (entry.nps_score >= 7) {
+        day.passives += 1;
+      } else {
+        day.detractors += 1;
+      }
     });
 
     const npsTrend = Array.from(dailyScores.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([_, values]) => Number((values.total / values.count).toFixed(1)));
+      .map(([_, values]) => {
+        if (values.total === 0) return 0;
+        const promoterPct = (values.promoters / values.total) * 100;
+        const detractorPct = (values.detractors / values.total) * 100;
+        return Number((promoterPct - detractorPct).toFixed(1));
+      });
 
     // Compile all transcriptions
     const transcriptions = feedbackEntries
@@ -167,7 +196,7 @@ export async function generateMonthlySummary(companyId: string) {
     let analysis = {
       positiveThemes: [],
       negativeThemes: [],
-      summary: `Monthly NPS Average: ${npsAverage.toFixed(1)}. No voice feedback received.`
+      summary: `Monthly NPS Score: ${npsScore.toFixed(1)}. No voice feedback received for analysis.`
     };
 
     if (transcriptions) {
@@ -206,7 +235,7 @@ export async function generateMonthlySummary(companyId: string) {
 
     return {
       yearMonth: startOfMonth.toISOString().slice(0, 7),
-      npsAverage,
+      npsAverage: npsScore,
       npsTrend,
       totalResponses: feedbackEntries.length,
       ...analysis

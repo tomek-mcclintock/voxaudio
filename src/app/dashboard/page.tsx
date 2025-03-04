@@ -1,3 +1,4 @@
+// src/app/dashboard/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -59,7 +60,7 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     try {
       const timestamp = new Date().getTime();
-      const response = await fetch(`/api/dashboard?timestamp=${timestamp}`, {
+      const response = await fetch(`/api/dashboard?limit=30&timestamp=${timestamp}`, {
         cache: 'no-store',
         next: { revalidate: 0 },
         headers: {
@@ -96,14 +97,14 @@ export default function DashboardPage() {
   const runAnalysis = async () => {
     try {
       setAnalysisRunning(true);
-      const response = await fetch('/api/run-analysis', {
+      const response = await fetch('/api/run-analysis?days=30', {
         method: 'POST'
       });
       if (!response.ok) {
         throw new Error('Failed to run analysis');
       }
       await fetchDashboardData();
-      alert('Analysis complete! The dashboard has been updated.');
+      alert('Sentiment analysis complete! The dashboard has been updated with the latest feedback analysis.');
     } catch (error) {
       console.error('Error running analysis:', error);
       alert('Failed to run analysis. Check console for details.');
@@ -148,7 +149,7 @@ export default function DashboardPage() {
     // Prepare summaries data
     const summariesData = dailySummaries.map(summary => ({
       'Date': new Date(summary.date).toLocaleDateString(),
-      'NPS Average': summary.nps_average,
+      'NPS Score': summary.nps_average,
       'Positive Themes': summary.positive_themes?.join(', ') || '',
       'Negative Themes': summary.negative_themes?.join(', ') || '',
       'Summary': summary.summary
@@ -218,7 +219,7 @@ export default function DashboardPage() {
                 : 'bg-blue-500 hover:bg-blue-600'
             } text-white font-semibold py-2 px-4 rounded transition-colors`}
           >
-            {analysisRunning ? 'Running Analysis...' : 'Run Daily Analysis'}
+            {analysisRunning ? 'Analyzing Sentiment...' : 'Analyze Feedback Sentiment'}
           </button>
         </div>
       </div>
@@ -226,8 +227,11 @@ export default function DashboardPage() {
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-2">30-Day NPS Average</h3>
+          <h3 className="text-lg font-semibold mb-2">30-Day NPS Score</h3>
           <p className="text-3xl font-bold">{overallNPS.toFixed(1)}</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Range: -100 to 100
+          </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-2">Total Responses</h3>
@@ -249,7 +253,11 @@ export default function DashboardPage() {
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
-              <YAxis domain={[0, 10]} />
+              <YAxis 
+                domain={[-100, 100]} 
+                ticks={[-100, -50, 0, 50, 100]} 
+                label={{ value: 'NPS Score', angle: -90, position: 'insideLeft' }} 
+              />
               <Tooltip />
               <Line 
                 type="monotone" 

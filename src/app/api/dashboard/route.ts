@@ -23,7 +23,24 @@ export async function GET(request: NextRequest) {
     if (userError) throw userError;
 
     const companyId = userData.company_id;
-    const now = new Date().toISOString();
+    const now = new Date();
+    
+    // Calculate date 30 days ago
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    
+    // Fetch daily summaries for the last 30 days
+    const { data: summaries, error: summariesError } = await supabase
+      .from('daily_summaries')
+      .select('*')
+      .eq('company_id', companyId)
+      .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+      .lte('date', now.toISOString().split('T')[0])
+      .order('date', { ascending: true });
+    
+    if (summariesError) {
+      throw summariesError;
+    }
 
     // Fetch feedback with question responses
     const { data: feedback, error: feedbackError } = await supabase
@@ -42,23 +59,10 @@ export async function GET(request: NextRequest) {
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(10)
-      .lte('created_at', now);
+      .lte('created_at', now.toISOString());
 
     if (feedbackError) {
       throw feedbackError;
-    }
-
-    // Fetch summaries
-    const { data: summaries, error: summariesError } = await supabase
-      .from('daily_summaries')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('date', { ascending: false })
-      .limit(30)
-      .lte('created_at', now);
-
-    if (summariesError) {
-      throw summariesError;
     }
 
     const headers = new Headers({
@@ -69,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     return new NextResponse(JSON.stringify({
       companyId,
-      timestamp: now,
+      timestamp: now.toISOString(),
       dailySummaries: summaries || [],
       recentFeedback: feedback || []
     }), {
