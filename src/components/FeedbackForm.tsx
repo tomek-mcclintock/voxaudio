@@ -191,20 +191,21 @@ export default function FeedbackForm({
         Share Your {companyData?.name || 'Experience'}
       </h1>
 
-      {showOrderInput && campaignData?.settings.requireOrderId && (
-        <div className="mb-8">
-          <label className="block font-manrope font-semibold text-gray-700 mb-2">
-            Order ID
-          </label>
-          <input
-            type="text"
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#657567] focus:border-[#657567] font-manrope"
-            value={localOrderId}
-            onChange={(e) => setLocalOrderId(e.target.value)}
-          />
-        </div>
-      )}
+      {(showOrderInput || campaignData?.settings.requireOrderId) && (
+  <div className="mb-8">
+    <label className="block font-manrope font-semibold text-gray-700 mb-2">
+      Order ID {campaignData?.settings.requireOrderId && <span className="text-red-500">*</span>}
+    </label>
+    <input
+      type="text"
+      required={campaignData?.settings.requireOrderId}
+      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#657567] focus:border-[#657567] font-manrope"
+      value={localOrderId}
+      onChange={(e) => setLocalOrderId(e.target.value)}
+    />
+  </div>
+)}
+
 
       {/* NPS Question */}
       {campaignData?.include_nps && (

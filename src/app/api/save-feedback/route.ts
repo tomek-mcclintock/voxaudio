@@ -51,10 +51,11 @@ export async function POST(request: NextRequest) {
       questionResponses
     });
 
-    if (!orderId || !companyId || !campaignId) {
-      console.log('Missing required fields');
+    // Validate basic required fields
+    if (!companyId || !campaignId) {
+      console.log('Missing required fields: company ID or campaign ID');
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: company ID or campaign ID' },
         { status: 400 }
       );
     }
@@ -71,6 +72,15 @@ export async function POST(request: NextRequest) {
       console.error('Invalid campaign:', campaignError);
       return NextResponse.json(
         { error: 'Invalid campaign' },
+        { status: 400 }
+      );
+    }
+
+    // Check order ID requirement based on campaign settings
+    if (campaign.settings && campaign.settings.requireOrderId && !orderId) {
+      console.log('Order ID is required but not provided');
+      return NextResponse.json(
+        { error: 'Order ID is required for this campaign' },
         { status: 400 }
       );
     }
@@ -125,7 +135,7 @@ export async function POST(request: NextRequest) {
       .insert({
         company_id: companyId,
         campaign_id: campaignId,
-        order_id: orderId,
+        order_id: orderId || null, // Make sure it's null if not provided
         nps_score: npsScore,
         voice_file_url: voiceFileUrl,
         transcription,
@@ -188,7 +198,7 @@ export async function POST(request: NextRequest) {
       try {
         const formattedData = formatFeedbackForSheets({
           created_at: feedback.created_at,
-          order_id: orderId,
+          order_id: orderId || 'N/A',
           nps_score: npsScore,
           transcription: transcription,
           sentiment: sentiment,
