@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     const textFeedback = formData.get('textFeedback') as string | null;
     const questionResponsesStr = formData.get('questionResponses') as string | null;
 
+    console.log('Order ID from form:', orderId);
     console.log('Raw questionResponsesStr:', questionResponsesStr);
 
     let questionResponses = null;
@@ -76,8 +77,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // No need to check for Order ID requirement - it comes from URL
-
     let voiceFileUrl = null;
     let transcription = null;
     let sentiment = null;
@@ -89,7 +88,7 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(arrayBuffer);
 
         console.log('Uploading to S3...');
-        voiceFileUrl = await uploadVoiceRecording(buffer, `${companyId}/${campaignId}/${orderId}`);
+        voiceFileUrl = await uploadVoiceRecording(buffer, `${companyId}/${campaignId}/${orderId || 'no-order-id'}`);
         console.log('S3 upload complete:', voiceFileUrl);
 
         console.log('Transcribing audio...');
@@ -121,6 +120,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Convert empty string OrderID to null to ensure it's properly handled by the database
+    const orderIdToSave = orderId && orderId.trim() !== '' ? orderId : null;
+    console.log('Order ID to save to database:', orderIdToSave);
+
     // Save feedback submission
     console.log('Saving feedback submission...');
     const { data: feedback, error: feedbackError } = await supabase
@@ -128,7 +131,7 @@ export async function POST(request: NextRequest) {
       .insert({
         company_id: companyId,
         campaign_id: campaignId,
-        order_id: orderId || null, // Make sure it's null if not provided
+        order_id: orderIdToSave,
         nps_score: npsScore,
         voice_file_url: voiceFileUrl,
         transcription,
@@ -140,6 +143,7 @@ export async function POST(request: NextRequest) {
 
     if (feedbackError) {
       console.error('Database error saving feedback:', feedbackError);
+      console.error('Error details:', feedbackError);
       return NextResponse.json(
         { error: 'Failed to save feedback' },
         { status: 500 }
@@ -191,7 +195,7 @@ export async function POST(request: NextRequest) {
       try {
         const formattedData = formatFeedbackForSheets({
           created_at: feedback.created_at,
-          order_id: orderId || 'N/A',
+          order_id: orderIdToSave || 'N/A',
           nps_score: npsScore,
           transcription: transcription,
           sentiment: sentiment,

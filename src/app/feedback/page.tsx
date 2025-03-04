@@ -15,8 +15,12 @@ export default async function FeedbackPage({
   let companyData = null;
   let campaignData = null;
 
-  // Get the Order ID from either id or OrderID parameter
+  // Get the Order ID from either OrderID or id parameter
   const orderId = searchParams.OrderID || searchParams.id || '';
+  
+  // Log OrderID for debugging
+  console.log('URL parameters:', searchParams);
+  console.log('Captured OrderID:', orderId);
 
   if (searchParams.cid) {
     // Get company data
