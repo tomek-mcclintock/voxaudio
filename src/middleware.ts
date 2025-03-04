@@ -1,3 +1,4 @@
+// src/middleware.ts
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -12,22 +13,42 @@ export async function middleware(req: NextRequest) {
     error,
   } = await supabase.auth.getSession();
 
-  console.log('Middleware session check:', session ? 'Found session' : 'No session');
-  if (error) console.error('Session error:', error);
-
   // Handle protected routes
   if (req.nextUrl.pathname.startsWith('/dashboard')) {
     if (!session) {
       const redirectUrl = new URL('/login', req.url);
-      console.log('No session, redirecting to:', redirectUrl.toString());
       return NextResponse.redirect(redirectUrl);
+    }
+
+    // Additional check for admin-only routes
+    if (req.nextUrl.pathname.startsWith('/dashboard/settings')) {
+      try {
+        // Get the user's role
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('email', session.user.email)
+          .single();
+
+        if (userError || !userData) {
+          throw new Error('Failed to get user role');
+        }
+
+        // If the user is not an admin, redirect to dashboard home
+        if (userData.role !== 'admin') {
+          return NextResponse.redirect(new URL('/dashboard', req.url));
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+        // In case of error, redirect to dashboard home to be safe
+        return NextResponse.redirect(new URL('/dashboard', req.url));
+      }
     }
   }
 
   // Handle auth routes when already logged in
-  if (req.nextUrl.pathname === '/login' && session) {
+  if ((req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/register') && session) {
     const redirectUrl = new URL('/dashboard', req.url);
-    console.log('Session exists, redirecting to:', redirectUrl.toString());
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -35,5 +56,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login']
+  matcher: ['/dashboard/:path*', '/login', '/register']
 };
