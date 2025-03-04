@@ -87,7 +87,8 @@ export default function FeedbackForm({
   
 
   const handleSubmit = async () => {
-    console.log("Starting submission with questionResponses:", questionResponses);
+    console.log("Starting submission with orderID:", localOrderId);
+      console.log("Starting submission with questionResponses:", questionResponses);
     console.log("Campaign Data:", campaignData);  
     if (!consent) {
       setError('Please accept the consent notice to submit feedback');
@@ -112,12 +113,12 @@ export default function FeedbackForm({
   
     setIsSubmitting(true);
     setError(null);
-  
+    
     try {
       if (audioRecorderRef.current) {
         audioRecorderRef.current.stopRecording();
       }
-  
+    
       const formData = new FormData();
       if (feedbackType === 'voice' && audioBlob) {
         formData.append('audio', audioBlob);
@@ -125,7 +126,10 @@ export default function FeedbackForm({
         formData.append('textFeedback', textFeedback);
       }
       
-      formData.append('orderId', localOrderId);
+      // Explicitly log the order ID we're adding to the form
+      console.log('Adding orderId to form:', localOrderId);
+      formData.append('orderId', localOrderId || '');
+      
       formData.append('companyId', companyId);
       if (campaignId) {
         formData.append('campaignId', campaignId);
@@ -133,7 +137,7 @@ export default function FeedbackForm({
       if (campaignData?.include_nps && npsScore) {
         formData.append('npsScore', npsScore.toString());
       }
-  
+    
       // Log question responses before submission
       console.log('Question responses before submission:', questionResponses);
       
@@ -142,24 +146,25 @@ export default function FeedbackForm({
         console.log('Stringified responses:', responsesJson);
         formData.append('questionResponses', responsesJson);
       }
-  
+    
       // Log entire FormData
+      console.log('Form data entries:');
       for (let pair of formData.entries()) {
-        console.log('FormData entry:', pair[0], pair[1]);
+        console.log(pair[0], ':', pair[1]);
       }
-  
+    
       const response = await fetch('/api/save-feedback', {
         method: 'POST',
         body: formData,
       });
-  
+    
       if (!response.ok) {
         throw new Error('Failed to submit feedback');
       }
-  
+    
       const result = await response.json();
       console.log('Submission response:', result);
-  
+    
       setSubmitted(true);
     } catch (err) {
       console.error('Submission error:', err);
@@ -168,7 +173,7 @@ export default function FeedbackForm({
       setIsSubmitting(false);
     }
   };
-  
+    
 
   if (submitted) {
     return (

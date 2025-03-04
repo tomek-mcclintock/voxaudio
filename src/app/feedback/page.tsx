@@ -9,36 +9,56 @@ import type { Campaign } from '@/types/campaign';
 export default async function FeedbackPage({
   searchParams,
 }: {
-  searchParams: { id?: string; OrderID?: string; cid?: string; campaign?: string };
+  searchParams: { [key: string]: string };
 }) {
   const supabase = createServerComponentClient({ cookies });
   let companyData = null;
   let campaignData = null;
 
-  // Get the Order ID from either OrderID or id parameter
-  const orderId = searchParams.OrderID || searchParams.id || '';
-  
-  // Log OrderID for debugging
+  // Log all URL parameters for debugging
   console.log('URL parameters:', searchParams);
+
+  // Find the order ID parameter regardless of case
+  const orderIdParam = Object.keys(searchParams).find(
+    key => key.toLowerCase() === 'orderid'
+  );
+  
+  // Get the order ID from the case-insensitive parameter or fallback to 'id'
+  const orderId = orderIdParam 
+    ? searchParams[orderIdParam] 
+    : (searchParams.id || '');
+  
   console.log('Captured OrderID:', orderId);
 
-  if (searchParams.cid) {
+  // Get company ID (cid) parameter
+  const cidParam = Object.keys(searchParams).find(
+    key => key.toLowerCase() === 'cid'
+  );
+  const companyId = cidParam ? searchParams[cidParam] : '';
+
+  // Get campaign parameter
+  const campaignParam = Object.keys(searchParams).find(
+    key => key.toLowerCase() === 'campaign'
+  );
+  const campaignId = campaignParam ? searchParams[campaignParam] : '';
+
+  if (companyId) {
     // Get company data
     const { data: company } = await supabase
       .from('companies')
       .select('id, name, logo_url, primary_color')
-      .eq('id', searchParams.cid)
+      .eq('id', companyId)
       .single();
     
     companyData = company;
 
     // If campaign ID is provided, get campaign details
-    if (searchParams.campaign) {
+    if (campaignId) {
       const { data: campaign } = await supabase
         .from('feedback_campaigns')
         .select('*')
-        .eq('id', searchParams.campaign)
-        .eq('company_id', searchParams.cid)
+        .eq('id', campaignId)
+        .eq('company_id', companyId)
         .single();
 
       campaignData = campaign;
@@ -48,7 +68,7 @@ export default async function FeedbackPage({
   // Check if the link is valid
   const isValid = 
     companyData && 
-    (searchParams.campaign ? campaignData : true);
+    (campaignId ? campaignData : true);
 
   if (!isValid) {
     return (
@@ -92,8 +112,8 @@ export default async function FeedbackPage({
           >
             <FeedbackForm 
               orderId={orderId} 
-              companyId={searchParams.cid || ''}
-              campaignId={searchParams.campaign}
+              companyId={companyId}
+              campaignId={campaignId}
               companyData={companyData}
               campaignData={campaignData as Campaign}
             />
