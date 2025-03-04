@@ -1,9 +1,16 @@
 // src/app/api/users/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+
+// Create a service role client that bypasses RLS
+const serviceRoleClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 // Function to generate a random password if needed
 function generatePassword() {
@@ -17,8 +24,9 @@ function generatePassword() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Use standard client for authentication and permission checking
     const supabase = createRouteHandlerClient({ cookies });
-    const { email, role, password: providedPassword, companyId } = await request.json();
+    const { email, role, password: providedPassword } = await request.json();
 
     // Validate required fields
     if (!email) {
@@ -58,15 +66,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use provided company ID or get from current user
-    const targetCompanyId = companyId || currentUserData.company_id;
-
     // Check if user already exists in this company
     const { data: existingUser } = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
-      .eq('company_id', targetCompanyId)
+      .eq('company_id', currentUserData.company_id)
       .single();
 
     if (existingUser) {
@@ -79,8 +84,8 @@ export async function POST(request: NextRequest) {
     // Generate password if not provided
     const password = providedPassword || generatePassword();
 
-    // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Create auth user using service role client
+    const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
       email,
       password,
       email_confirm: true
@@ -94,14 +99,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create user record
-    const { data: userData, error: userError } = await supabase
+    // Create user record using service role client to bypass RLS
+    const { data: userData, error: userError } = await serviceRoleClient
       .from('users')
       .insert([{
         id: authData.user.id, // Use the auth user ID
         email,
-        company_id: targetCompanyId,
-        role: role || 'standard'
+        company_id: currentUserData.company_id,
+        role: role || 'standard',
+        status: 'active'
       }])
       .select()
       .single();
@@ -109,7 +115,7 @@ export async function POST(request: NextRequest) {
     if (userError) {
       console.error('User record creation error:', userError);
       // Try to delete the auth user if user record creation fails
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      await serviceRoleClient.auth.admin.deleteUser(authData.user.id);
       
       return NextResponse.json(
         { error: 'Failed to create user record: ' + userError.message },
@@ -155,23 +161,30 @@ export async function GET(request: NextRequest) {
     // Get user's company
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('company_id')
+      .select('company_id, role')
       .eq('email', currentUser.email)
       .single();
 
     if (userError) {
-      throw userError;
+      return NextResponse.json(
+        { error: 'Failed to fetch user data' },
+        { status: 500 }
+      );
     }
 
-    // Get all users for this company
-    const { data: users, error: usersError } = await supabase
+    // Get all users for this company using service role client
+    const { data: users, error: usersError } = await serviceRoleClient
       .from('users')
       .select('*')
       .eq('company_id', userData.company_id)
       .order('created_at', { ascending: false });
 
     if (usersError) {
-      throw usersError;
+      console.error('Error fetching users:', usersError);
+      return NextResponse.json(
+        { error: 'Failed to fetch users' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ users: users || [] });
@@ -264,8 +277,8 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Update the user role
-    const { data: updatedUser, error: updateError } = await supabase
+    // Update the user role using service role client
+    const { data: updatedUser, error: updateError } = await serviceRoleClient
       .from('users')
       .update({ role })
       .eq('id', userId)
@@ -273,7 +286,11 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (updateError) {
-      throw updateError;
+      console.error('Error updating user role:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update user role' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -362,19 +379,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete the user record
-    const { error: deleteUserError } = await supabase
+    // Delete the user record using service role client
+    const { error: deleteUserError } = await serviceRoleClient
       .from('users')
       .delete()
       .eq('id', userId);
 
     if (deleteUserError) {
-      throw deleteUserError;
+      console.error('Error deleting user record:', deleteUserError);
+      return NextResponse.json(
+        { error: 'Failed to delete user record' },
+        { status: 500 }
+      );
     }
 
-    // Delete auth user
-    // Note: This requires Supabase service role key to work properly
-    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
+    // Delete auth user using service role client
+    const { error: deleteAuthError } = await serviceRoleClient.auth.admin.deleteUser(userId);
 
     if (deleteAuthError) {
       console.warn('Could not delete auth user:', deleteAuthError);

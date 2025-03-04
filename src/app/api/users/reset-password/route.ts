@@ -1,9 +1,16 @@
 // src/app/api/users/reset-password/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+
+// Create a service role client that bypasses RLS
+const serviceRoleClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 // Function to generate a random password
 function generatePassword() {
@@ -81,15 +88,18 @@ export async function POST(request: NextRequest) {
     // Generate a new password
     const newPassword = generatePassword();
 
-    // Update the user's password
-    // Note: This requires Supabase service role key to work properly
-    const { error: resetError } = await supabase.auth.admin.updateUserById(
+    // Update the user's password using service role client
+    const { error: resetError } = await serviceRoleClient.auth.admin.updateUserById(
       userId,
       { password: newPassword }
     );
 
     if (resetError) {
-      throw resetError;
+      console.error('Error resetting password:', resetError);
+      return NextResponse.json(
+        { error: 'Failed to reset password: ' + resetError.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
