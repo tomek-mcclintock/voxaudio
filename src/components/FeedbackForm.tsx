@@ -71,8 +71,7 @@ export default function FeedbackForm({
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
-  const [showOrderInput, setShowOrderInput] = useState(!orderId);
-  const [localOrderId, setLocalOrderId] = useState(orderId);
+  const [localOrderId] = useState(orderId); // No setState function, making it read-only
 
   const handleQuestionResponse = (questionId: string, value: any) => {
     console.log(`Setting response for question ${questionId}:`, value);
@@ -97,11 +96,6 @@ export default function FeedbackForm({
   
     if (campaignData?.include_nps && !npsScore) {
       setError('Please provide an NPS score');
-      return;
-    }
-    
-    if (!localOrderId && showOrderInput && campaignData?.settings.requireOrderId) {
-      setError('Please provide an order ID');
       return;
     }
   
@@ -190,22 +184,6 @@ export default function FeedbackForm({
       <h1 className="font-lora text-3xl text-gray-800 mb-8">
         Share Your {companyData?.name || 'Experience'}
       </h1>
-
-      {(showOrderInput || campaignData?.settings.requireOrderId) && (
-  <div className="mb-8">
-    <label className="block font-manrope font-semibold text-gray-700 mb-2">
-      Order ID {campaignData?.settings.requireOrderId && <span className="text-red-500">*</span>}
-    </label>
-    <input
-      type="text"
-      required={campaignData?.settings.requireOrderId}
-      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#657567] focus:border-[#657567] font-manrope"
-      value={localOrderId}
-      onChange={(e) => setLocalOrderId(e.target.value)}
-    />
-  </div>
-)}
-
 
       {/* NPS Question */}
       {campaignData?.include_nps && (

@@ -1,3 +1,4 @@
+// src/app/api/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -39,8 +40,7 @@ export async function POST(request: NextRequest) {
           questions: campaignData.include_additional_questions ? campaignData.questions : [],
           settings: campaignData.settings || {
             allowVoice: true,
-            allowText: true,
-            requireOrderId: true
+            allowText: true
           },
           active: true
         }

@@ -76,14 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check order ID requirement based on campaign settings
-    if (campaign.settings && campaign.settings.requireOrderId && !orderId) {
-      console.log('Order ID is required but not provided');
-      return NextResponse.json(
-        { error: 'Order ID is required for this campaign' },
-        { status: 400 }
-      );
-    }
+    // No need to check for Order ID requirement - it comes from URL
 
     let voiceFileUrl = null;
     let transcription = null;

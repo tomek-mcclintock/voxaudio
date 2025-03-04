@@ -9,11 +9,14 @@ import type { Campaign } from '@/types/campaign';
 export default async function FeedbackPage({
   searchParams,
 }: {
-  searchParams: { id?: string; cid?: string; campaign?: string };
+  searchParams: { id?: string; OrderID?: string; cid?: string; campaign?: string };
 }) {
   const supabase = createServerComponentClient({ cookies });
   let companyData = null;
   let campaignData = null;
+
+  // Get the Order ID from either id or OrderID parameter
+  const orderId = searchParams.OrderID || searchParams.id || '';
 
   if (searchParams.cid) {
     // Get company data
@@ -41,8 +44,7 @@ export default async function FeedbackPage({
   // Check if the link is valid
   const isValid = 
     companyData && 
-    (searchParams.campaign ? campaignData : true) && 
-    (!searchParams.id || (searchParams.id && searchParams.id.length > 0));
+    (searchParams.campaign ? campaignData : true);
 
   if (!isValid) {
     return (
@@ -85,7 +87,7 @@ export default async function FeedbackPage({
             }
           >
             <FeedbackForm 
-              orderId={searchParams.id || ''} 
+              orderId={orderId} 
               companyId={searchParams.cid || ''}
               campaignId={searchParams.campaign}
               companyData={companyData}

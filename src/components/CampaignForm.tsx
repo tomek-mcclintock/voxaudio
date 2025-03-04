@@ -25,7 +25,6 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
   const [settings, setSettings] = useState({
     allowVoice: true,
     allowText: true,
-    requireOrderId: true,
     ...initialData?.settings
   });
 
@@ -177,14 +176,6 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
               onChange={(e) => setSettings({...settings, allowText: e.target.checked})}
             />
             <span>Allow text feedback</span>
-          </label>
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={settings.requireOrderId}
-              onChange={(e) => setSettings({...settings, requireOrderId: e.target.checked})}
-            />
-            <span>Require order ID</span>
           </label>
         </div>
       </div>
