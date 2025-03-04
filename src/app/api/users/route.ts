@@ -99,18 +99,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create user record using service role client to bypass RLS
-    const { data: userData, error: userError } = await serviceRoleClient
-      .from('users')
-      .insert([{
-        id: authData.user.id, // Use the auth user ID
-        email,
-        company_id: currentUserData.company_id,
-        role: role || 'standard',
-        status: 'active'
-      }])
-      .select()
-      .single();
+// Create user record using service role client to bypass RLS
+const { data: userData, error: userError } = await serviceRoleClient
+  .from('users')
+  .insert([{
+    id: authData.user.id, // Use the auth user ID
+    email,
+    company_id: currentUserData.company_id,
+    role: role || 'standard'
+    // Remove status field to prevent errors if column doesn't exist
+  }])
+  .select()
+  .single();
+
+
 
     if (userError) {
       console.error('User record creation error:', userError);
