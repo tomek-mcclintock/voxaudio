@@ -126,13 +126,29 @@ export async function POST(request: NextRequest) {
 
     // Save feedback submission
     console.log('Saving feedback submission...');
+    
+    // First, check if the campaign has NPS enabled
+    const { data: campaignSettings, error: settingsError } = await supabase
+      .from('feedback_campaigns')
+      .select('include_nps')
+      .eq('id', campaignId)
+      .single();
+      
+    if (settingsError) {
+      console.error('Error checking campaign NPS settings:', settingsError);
+      // Continue anyway with default behavior
+    }
+    
+    // Use null for NPS score if not included in campaign
+    const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
+    
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .insert({
         company_id: companyId,
         campaign_id: campaignId,
         order_id: orderIdToSave,
-        nps_score: npsScore,
+        nps_score: finalNpsScore,
         voice_file_url: voiceFileUrl,
         transcription,
         sentiment,
