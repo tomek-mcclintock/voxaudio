@@ -9,5 +9,11 @@ const nextConfig = {
       fullUrl: true,
     },
   },
-  output: 'standalone'
+  output: 'standalone',
+  // Add this images configuration
+  images: {
+    domains: ['naavavnfezatboofkdvr.supabase.co'],
+  },
 }
+
+module.exports = nextConfig
