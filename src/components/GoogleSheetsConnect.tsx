@@ -92,70 +92,63 @@ export default function GoogleSheetsConnect({ campaignId, onConnect }: GoogleShe
     }
   };
 
-  return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-semibold mb-4">Google Sheets Integration</h3>
-      
-      {!isConnected ? (
-        <div>
-          <p className="text-gray-600 mb-4">
-            Connect to Google Sheets to automatically sync feedback responses.
-          </p>
-          <button
-            onClick={handleConnect}
-            disabled={loading}
-            className="bg-[#657567] text-white px-4 py-2 rounded hover:bg-[#4d594d] disabled:bg-gray-400"
-          >
-            {loading ? 'Connecting...' : 'Connect Google Sheets'}
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Spreadsheet ID
-            </label>
-            <input
-              type="text"
-              value={spreadsheetId}
-              onChange={(e) => setSpreadsheetId(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              placeholder="Enter spreadsheet ID from URL"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Sheet Name
-            </label>
-            <input
-              type="text"
-              value={sheetName}
-              onChange={(e) => setSheetName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              placeholder="e.g., Sheet1"
-            />
-          </div>
+  if (!isConnected) {
+    return (
+      <button
+        onClick={handleConnect}
+        disabled={loading}
+        className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded transition-colors disabled:bg-gray-400"
+      >
+        {loading ? 'Connecting...' : 'Connect Google Sheets'}
+      </button>
+    );
+  }
 
-          <div className="flex justify-between">
-            <button
-              onClick={handleUpdateSheet}
-              disabled={loading || !spreadsheetId || !sheetName}
-              className="bg-[#657567] text-white px-4 py-2 rounded hover:bg-[#4d594d] disabled:bg-gray-400"
-            >
-              {loading ? 'Updating...' : 'Update Sheet Details'}
-            </button>
-            
-            <button
-              onClick={handleDisconnect}
-              disabled={loading}
-              className="text-red-600 hover:text-red-800"
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
-      )}
+  return (
+    <div className="space-y-4 bg-white rounded-lg shadow p-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Spreadsheet ID
+        </label>
+        <input
+          type="text"
+          value={spreadsheetId}
+          onChange={(e) => setSpreadsheetId(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+          placeholder="Enter spreadsheet ID from URL"
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Sheet Name
+        </label>
+        <input
+          type="text"
+          value={sheetName}
+          onChange={(e) => setSheetName(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+          placeholder="e.g., Sheet1"
+        />
+      </div>
+
+      <div className="flex justify-between">
+        <button
+          onClick={handleUpdateSheet}
+          disabled={loading || !spreadsheetId || !sheetName}
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
+        >
+          {loading ? 'Updating...' : 'Update Sheet Details'}
+        </button>
+        
+        <button
+          onClick={handleDisconnect}
+          disabled={loading}
+          className="text-red-600 hover:text-red-800"
+        >
+          Disconnect
+        </button>
+      </div>
     </div>
   );
 }

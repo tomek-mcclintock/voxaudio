@@ -6,7 +6,7 @@ import { useCompany } from '@/lib/contexts/CompanyContext';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import GoogleSheetsConnect from '@/components/GoogleSheetsConnect';
+import * as XLSX from 'xlsx';
 
 interface CampaignData {
   id: string;
@@ -15,18 +15,23 @@ interface CampaignData {
   end_date: string | null;
   active: boolean;
   created_at: string;
+  include_nps: boolean;
 }
 
 interface FeedbackData {
   created_at: string;
-  nps_score: number;
+  nps_score: number | null;
   transcription: string | null;
   sentiment: string | null;
+  question_responses: Array<{
+    question_id: string;
+    response_value: string;
+  }> | null;
 }
 
 interface CampaignStats {
   totalResponses: number;
-  averageNPS: number;
+  averageNPS: number | null;
   responsesWithVoice: number;
   positiveCount: number;
   negativeCount: number;
@@ -55,10 +60,24 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         
         // Calculate stats
         const totalResponses = data.feedback.length;
-        const npsScores = data.feedback.map((f: FeedbackData) => f.nps_score);
-        const averageNPS = totalResponses ? 
-          npsScores.reduce((a: number, b: number) => a + b, 0) / totalResponses : 
-          0;
+        
+        // Only calculate NPS if the campaign includes NPS questions
+        let averageNPS = null;
+        if (data.campaign.include_nps) {
+          const npsScores = data.feedback
+            .filter((f: FeedbackData) => f.nps_score !== null)
+            .map((f: FeedbackData) => f.nps_score);
+          
+          // Calculate proper NPS (-100 to 100 scale)
+          if (npsScores.length > 0) {
+            const promoters = npsScores.filter((score: number | null) => score !== null && score >= 9).length;
+            const detractors = npsScores.filter((score: number | null) => score !== null && score <= 6).length;
+            const promoterPercentage = (promoters / npsScores.length) * 100;
+            const detractorPercentage = (detractors / npsScores.length) * 100;
+            averageNPS = promoterPercentage - detractorPercentage;
+          }
+        }
+        
         
         const stats: CampaignStats = {
           totalResponses,
@@ -78,6 +97,42 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
     }
   };
 
+  const exportToExcel = () => {
+    if (!campaign || !feedback) return;
+
+    // Prepare feedback data
+    const feedbackData = feedback.map(feedback => {
+      // Base feedback data
+      const baseData: any = {
+        'Date': new Date(feedback.created_at).toLocaleDateString(),
+        'Voice Feedback': feedback.transcription || '',
+        'Sentiment': feedback.sentiment || ''
+      };
+
+      // Add NPS score if campaign includes NPS
+      if (campaign.include_nps) {
+        baseData['NPS Score'] = feedback.nps_score;
+      }
+
+      // Add question responses
+      if (feedback.question_responses) {
+        feedback.question_responses.forEach(response => {
+          baseData[`Question ${response.question_id}`] = response.response_value;
+        });
+      }
+
+      return baseData;
+    });
+
+    // Create workbook and add worksheets
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(feedbackData);
+    XLSX.utils.book_append_sheet(wb, ws, campaign.name);
+
+    // Generate Excel file
+    XLSX.writeFile(wb, `${campaign.name}-feedback-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   if (loading) {
     return <div className="p-8">Loading campaign data...</div>;
   }
@@ -86,13 +141,21 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
     return <div className="p-8">Campaign not found</div>;
   }
 
-  // Prepare data for NPS trend chart
-  const chartData = feedback
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    .map(item => ({
-      date: new Date(item.created_at).toLocaleDateString(),
-      nps: item.nps_score
-    }));
+  // Prepare data for NPS trend chart if campaign includes NPS
+  const chartData = campaign.include_nps 
+    ? feedback
+        .filter(item => item.nps_score !== null)
+        .map(item => {
+          const date = new Date(item.created_at);
+          // Group by date
+          return {
+            date: date.toLocaleDateString(),
+            timestamp: date.getTime(),
+            nps: item.nps_score
+          };
+        })
+        .sort((a, b) => a.timestamp - b.timestamp)
+    : [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -125,67 +188,94 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         </div>
       </div>
 
-      {/* Google Sheets Integration Section */}
-      <div className="mb-8">
-        <GoogleSheetsConnect 
-          campaignId={params.id}
-          onConnect={fetchCampaignData}
-        />
+      {/* Action Buttons */}
+      <div className="flex gap-4 mb-8">
+        <button
+          onClick={exportToExcel}
+          className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded transition-colors"
+        >
+          Export to Excel
+        </button>
+        
+        <button
+          onClick={() => window.location.href = `/api/auth/google/url?campaignId=${params.id}`}
+          className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded transition-colors"
+        >
+          Connect Google Sheets
+        </button>
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-sm font-medium text-gray-500">Total Responses</h3>
             <p className="text-3xl font-semibold">{stats.totalResponses}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Average NPS</h3>
-            <p className="text-3xl font-semibold">{stats.averageNPS.toFixed(1)}</p>
-          </div>
+          {campaign.include_nps && stats.averageNPS !== null && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-sm font-medium text-gray-500">NPS Score</h3>
+              <p className="text-3xl font-semibold">{stats.averageNPS.toFixed(1)}</p>
+              <p className="text-xs text-gray-500">Range: -100 to 100</p>
+            </div>
+          )}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-sm font-medium text-gray-500">Voice Responses</h3>
             <p className="text-3xl font-semibold">{stats.responsesWithVoice}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Sentiment</h3>
-            <div className="flex gap-2 mt-2">
-              <span className="px-2 py-1 bg-green-100 text-green-800 rounded">
-                +{stats.positiveCount}
-              </span>
-              <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded">
-                ={stats.neutralCount}
-              </span>
-              <span className="px-2 py-1 bg-red-100 text-red-800 rounded">
-                -{stats.negativeCount}
-              </span>
+        </div>
+      )}
+
+      {/* NPS Trend Chart - Only show if campaign includes NPS */}
+      {campaign.include_nps && chartData.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold mb-4">NPS Score Trend</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis 
+                  domain={[-100, 100]} 
+                  ticks={[-100, -50, 0, 50, 100]} 
+                  label={{ value: 'NPS Score', angle: -90, position: 'insideLeft' }} 
+                />
+                <Tooltip />
+                <Line 
+                  type="monotone" 
+                  dataKey="nps" 
+                  stroke="#2563eb" 
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Sentiment Analysis */}
+      {stats && (stats.positiveCount > 0 || stats.negativeCount > 0 || stats.neutralCount > 0) && (
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold mb-4">Sentiment Analysis</h2>
+          <div className="flex gap-4">
+            <div className="flex-1 bg-green-50 p-4 rounded-lg">
+              <div className="text-green-700 font-semibold mb-2">Positive</div>
+              <div className="text-3xl font-bold text-green-600">{stats.positiveCount}</div>
+            </div>
+            <div className="flex-1 bg-gray-50 p-4 rounded-lg">
+              <div className="text-gray-700 font-semibold mb-2">Neutral</div>
+              <div className="text-3xl font-bold text-gray-600">{stats.neutralCount}</div>
+            </div>
+            <div className="flex-1 bg-red-50 p-4 rounded-lg">
+              <div className="text-red-700 font-semibold mb-2">Negative</div>
+              <div className="text-3xl font-bold text-red-600">{stats.negativeCount}</div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">NPS Trend</h2>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis domain={[0, 10]} />
-              <Tooltip />
-              <Line 
-                type="monotone" 
-                dataKey="nps" 
-                stroke="#2563eb" 
-                strokeWidth={2}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
+      {/* Recent Feedback Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-6 border-b">
           <h2 className="text-lg font-semibold">Recent Feedback</h2>
@@ -194,18 +284,12 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  NPS Score
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Sentiment
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Feedback
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                {campaign.include_nps && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NPS Score</th>
+                )}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -214,15 +298,21 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(item.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
-                      item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {item.nps_score}
-                    </span>
-                  </td>
+                  {campaign.include_nps && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {item.nps_score !== null ? (
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
+                          item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {item.nps_score}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">N/A</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {item.sentiment || 'N/A'}
                   </td>
