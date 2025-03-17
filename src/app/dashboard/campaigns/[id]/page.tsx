@@ -16,6 +16,7 @@ interface CampaignData {
   active: boolean;
   created_at: string;
   include_nps: boolean;
+  summary?: string | null;
 }
 
 interface FeedbackData {
@@ -56,6 +57,8 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
   const [stats, setStats] = useState<CampaignStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   useEffect(() => {
     fetchCampaignData();
@@ -69,6 +72,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
       if (response.ok) {
         setCampaign(data.campaign);
         setFeedback(data.feedback);
+        setSummary(data.campaign.summary || null);
         
         // Calculate stats
         const totalResponses = data.feedback.length;
@@ -141,6 +145,29 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
       console.error('Error fetching campaign data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateSummary = async () => {
+    if (!campaign) return;
+    
+    setIsGeneratingSummary(true);
+    try {
+      const response = await fetch(`/api/campaigns/${params.id}/summary`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate summary');
+      }
+      
+      const data = await response.json();
+      setSummary(data.summary);
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      alert('Failed to generate summary');
+    } finally {
+      setIsGeneratingSummary(false);
     }
   };
 
@@ -234,7 +261,23 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         >
           Connect Google Sheets
         </button>
+        
+        <button
+          onClick={generateSummary}
+          disabled={isGeneratingSummary}
+          className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded transition-colors disabled:bg-gray-400"
+        >
+          {isGeneratingSummary ? 'Generating...' : 'Generate Summary'}
+        </button>
       </div>
+
+      {/* Summary Section */}
+      {summary && (
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold mb-4">Feedback Summary</h2>
+          <p className="text-gray-700 whitespace-pre-line">{summary}</p>
+        </div>
+      )}
 
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
