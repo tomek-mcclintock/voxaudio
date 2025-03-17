@@ -38,12 +38,24 @@ interface CampaignStats {
   neutralCount: number;
 }
 
+interface DailyNpsData {
+  promoters: number;
+  detractors: number;
+  total: number;
+}
+
+interface ChartDataPoint {
+  date: string;
+  nps: number;
+}
+
 export default function CampaignDetails({ params }: { params: { id: string } }) {
   const company = useCompany();
   const [campaign, setCampaign] = useState<CampaignData | null>(null);
   const [feedback, setFeedback] = useState<FeedbackData[]>([]);
   const [stats, setStats] = useState<CampaignStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
   useEffect(() => {
     fetchCampaignData();
@@ -78,7 +90,6 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
           }
         }
         
-        
         const stats: CampaignStats = {
           totalResponses,
           averageNPS,
@@ -89,6 +100,42 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         };
         
         setStats(stats);
+        
+        // Prepare chart data if campaign includes NPS
+        if (data.campaign.include_nps) {
+          const npsDataByDate: Record<string, DailyNpsData> = {};
+          
+          // Group feedback by date and count promoters/detractors
+          data.feedback.forEach((item: FeedbackData) => {
+            if (item.nps_score === null) return;
+            
+            const date = new Date(item.created_at).toLocaleDateString();
+            if (!npsDataByDate[date]) {
+              npsDataByDate[date] = { promoters: 0, detractors: 0, total: 0 };
+            }
+            
+            if (item.nps_score >= 9) npsDataByDate[date].promoters++;
+            if (item.nps_score <= 6) npsDataByDate[date].detractors++;
+            npsDataByDate[date].total++;
+          });
+          
+          // Convert to array for the chart
+          const chartPoints: ChartDataPoint[] = Object.entries(npsDataByDate)
+            .map(([dateStr, data]) => {
+              const promoterPct = (data.promoters / data.total) * 100;
+              const detractorPct = (data.detractors / data.total) * 100;
+              const npsScore = promoterPct - detractorPct;
+              return {
+                date: dateStr,
+                nps: npsScore
+              };
+            })
+            .sort((a: ChartDataPoint, b: ChartDataPoint) => 
+              new Date(a.date).getTime() - new Date(b.date).getTime()
+            );
+          
+          setChartData(chartPoints);
+        }
       }
     } catch (error) {
       console.error('Error fetching campaign data:', error);
@@ -103,7 +150,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
     // Prepare feedback data
     const feedbackData = feedback.map(feedback => {
       // Base feedback data
-      const baseData: any = {
+      const baseData: Record<string, any> = {
         'Date': new Date(feedback.created_at).toLocaleDateString(),
         'Voice Feedback': feedback.transcription || '',
         'Sentiment': feedback.sentiment || ''
@@ -140,22 +187,6 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
   if (!campaign) {
     return <div className="p-8">Campaign not found</div>;
   }
-
-  // Prepare data for NPS trend chart if campaign includes NPS
-  const chartData = campaign.include_nps 
-    ? feedback
-        .filter(item => item.nps_score !== null)
-        .map(item => {
-          const date = new Date(item.created_at);
-          // Group by date
-          return {
-            date: date.toLocaleDateString(),
-            timestamp: date.getTime(),
-            nps: item.nps_score
-          };
-        })
-        .sort((a, b) => a.timestamp - b.timestamp)
-    : [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

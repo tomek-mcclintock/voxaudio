@@ -29,8 +29,8 @@ export default function GoogleSheetsConnect({ campaignId, onConnect }: GoogleShe
 
     if (data) {
       setIsConnected(true);
-      setSpreadsheetId(data.spreadsheet_id);
-      setSheetName(data.sheet_name);
+      setSpreadsheetId(data.spreadsheet_id || '');
+      setSheetName(data.sheet_name || '');
     }
   };
 
