@@ -198,14 +198,15 @@ export default function FeedbackForm({
       ? 'bg-yellow-500 text-white ring-2 ring-yellow-500 ring-offset-2'
       : 'bg-yellow-200 text-yellow-700 opacity-75';
     
-    if (npsScore === null) {
-      return `bg-[${primaryColor}] text-white hover:bg-opacity-90`;
-    } else if (npsScore === score) {
-      return `bg-[${primaryColor}] text-white ring-2 ring-[${primaryColor}] ring-offset-2`;
-    } else {
-      return `bg-[${scoreLightColor}] text-[${primaryColor}] opacity-75`;
-    }
-  };
+      if (npsScore === null) {
+        return 'bg-green-500 text-white hover:bg-green-600';
+      } else if (npsScore === score) {
+        return 'bg-green-500 text-white ring-2 ring-green-500 ring-offset-2';
+      } else {
+        return 'bg-green-200 text-green-700 opacity-75';
+      }
+    };
+    
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
