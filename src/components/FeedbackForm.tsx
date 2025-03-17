@@ -230,9 +230,7 @@ export default function FeedbackForm({
                   onClick={() => setNpsScore(score)}
                   className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
                     ${getScoreColor(score)}`}
-                  style={score >= 9 ? {
-                    backgroundColor: npsScore === score || npsScore === null ? companyData?.primary_color || '#657567' : undefined
-                  } : {}}
+                    style={{}} // Remove the conditional style for scores 9 and 10
                 >
                   {score}
                 </button>
