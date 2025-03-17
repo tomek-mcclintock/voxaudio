@@ -10,10 +10,11 @@ export interface AudioRecorderRef {
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob | null) => void;
+  companyColor?: string; // New prop for company primary color
 }
 
 const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
-  ({ onRecordingComplete }, ref) => {
+  ({ onRecordingComplete, companyColor = '#657567' }, ref) => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -59,7 +60,8 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       const barWidth = canvas.width / 50;
       const heightMultiplier = canvas.height / 255;
       
-      ctx.fillStyle = '#657567'; // Sage color
+      // Use the company color
+      ctx.fillStyle = companyColor;
       
       for (let i = 0; i < 50; i++) {
         const value = dataArray[i * 2];
@@ -186,7 +188,8 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
           {!isRecording && !audioBlob ? (
             <button
               onClick={startRecording}
-              className="p-4 rounded-full bg-[#657567] hover:bg-[#4d594d] transition-colors duration-200"
+              className="p-4 rounded-full transition-colors duration-200"
+              style={{ backgroundColor: companyColor }}
               aria-label="Start recording"
             >
               <Mic className="w-8 h-8 text-white" />
@@ -203,7 +206,8 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
             <div className="flex gap-3">
               <button
                 onClick={togglePlayback}
-                className="p-4 rounded-full bg-[#657567] hover:bg-[#4d594d] transition-colors duration-200"
+                className="p-4 rounded-full transition-colors duration-200"
+                style={{ backgroundColor: companyColor }}
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (

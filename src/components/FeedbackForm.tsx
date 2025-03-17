@@ -85,10 +85,9 @@ export default function FeedbackForm({
     });
   };
   
-
   const handleSubmit = async () => {
     console.log("Starting submission with orderID:", localOrderId);
-      console.log("Starting submission with questionResponses:", questionResponses);
+    console.log("Starting submission with questionResponses:", questionResponses);
     console.log("Campaign Data:", campaignData);  
     if (!consent) {
       setError('Please accept the consent notice to submit feedback');
@@ -173,7 +172,6 @@ export default function FeedbackForm({
       setIsSubmitting(false);
     }
   };
-    
 
   if (submitted) {
     return (
@@ -183,6 +181,31 @@ export default function FeedbackForm({
       </div>
     );
   }
+
+  // Function to determine button color based on NPS score
+  const getScoreColor = (score: number) => {
+    const primaryColor = companyData?.primary_color || '#657567';
+    const scoreLightColor = `${primaryColor}33`; // Add 33 (20% opacity) to the hex color
+    
+    if (score <= 6) return npsScore === null
+      ? 'bg-red-500 text-white hover:bg-red-600'
+      : npsScore === score
+      ? 'bg-red-500 text-white ring-2 ring-red-500 ring-offset-2'
+      : 'bg-red-200 text-red-700 opacity-75';
+    if (score <= 8) return npsScore === null
+      ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+      : npsScore === score
+      ? 'bg-yellow-500 text-white ring-2 ring-yellow-500 ring-offset-2'
+      : 'bg-yellow-200 text-yellow-700 opacity-75';
+    
+    if (npsScore === null) {
+      return `bg-[${primaryColor}] text-white hover:bg-opacity-90`;
+    } else if (npsScore === score) {
+      return `bg-[${primaryColor}] text-white ring-2 ring-[${primaryColor}] ring-offset-2`;
+    } else {
+      return `bg-[${scoreLightColor}] text-[${primaryColor}] opacity-75`;
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
@@ -199,25 +222,6 @@ export default function FeedbackForm({
           <div className="flex justify-between gap-2 mb-2">
             {[...Array(10)].map((_, i) => {
               const score = i + 1;
-              const getScoreColor = (score: number) => {
-                if (score <= 6) return npsScore === null
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : npsScore === score
-                  ? 'bg-red-500 text-white ring-2 ring-red-500 ring-offset-2'
-                  : 'bg-red-200 text-red-700 opacity-75';
-                if (score <= 8) return npsScore === null
-                  ? 'bg-yellow-500 text-white hover:bg-yellow-600'
-                  : npsScore === score
-                  ? 'bg-yellow-500 text-white ring-2 ring-yellow-500 ring-offset-2'
-                  : 'bg-yellow-200 text-yellow-700 opacity-75';
-                return npsScore === null
-                  ? 'bg-green-500 text-white hover:bg-green-600'
-                  : npsScore === score
-                  ? 'bg-green-500 text-white ring-2 ring-green-500 ring-offset-2'
-                  : 'bg-green-200 text-green-700 opacity-75';
-              };
-              
-
               return (
                 <button
                   key={score}
@@ -225,6 +229,9 @@ export default function FeedbackForm({
                   onClick={() => setNpsScore(score)}
                   className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
                     ${getScoreColor(score)}`}
+                  style={score >= 9 ? {
+                    backgroundColor: npsScore === score || npsScore === null ? companyData?.primary_color || '#657567' : undefined
+                  } : {}}
                 >
                   {score}
                 </button>
@@ -238,53 +245,52 @@ export default function FeedbackForm({
         </div>
       )}
 
-{/* Additional Questions Section */}
-{campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (
-  <div className="space-y-6 mb-8">
-    <h3 className="font-manrope font-semibold text-gray-700">Additional Questions</h3>
-    {campaignData.questions.map((question: CampaignQuestion) => (
-      <div key={question.id} className="space-y-2">
-        <label className="block font-manrope text-gray-700">
-          {question.text}
-          {question.required && <span className="text-red-500 ml-1">*</span>}
-        </label>
-        
-        {question.type === 'text' && (
-          <TextQuestion
-            question={question}
-            value={questionResponses[question.id] || ''}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
-        
-        {question.type === 'rating' && (
-          <RatingQuestion
-            question={question}
-            value={questionResponses[question.id] || null}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
-        
-        {question.type === 'multiple_choice' && (
-          <MultipleChoiceQuestion
-            question={question}
-            value={questionResponses[question.id] || ''}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
-        
-        {question.type === 'yes_no' && (
-          <YesNoQuestion
-            question={question}
-            value={questionResponses[question.id] || ''}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
-      </div>
-    ))}
-  </div>
-)}
-
+      {/* Additional Questions Section */}
+      {campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (
+        <div className="space-y-6 mb-8">
+          <h3 className="font-manrope font-semibold text-gray-700">Additional Questions</h3>
+          {campaignData.questions.map((question: CampaignQuestion) => (
+            <div key={question.id} className="space-y-2">
+              <label className="block font-manrope text-gray-700">
+                {question.text}
+                {question.required && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              
+              {question.type === 'text' && (
+                <TextQuestion
+                  question={question}
+                  value={questionResponses[question.id] || ''}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+              
+              {question.type === 'rating' && (
+                <RatingQuestion
+                  question={question}
+                  value={questionResponses[question.id] || null}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+              
+              {question.type === 'multiple_choice' && (
+                <MultipleChoiceQuestion
+                  question={question}
+                  value={questionResponses[question.id] || ''}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+              
+              {question.type === 'yes_no' && (
+                <YesNoQuestion
+                  question={question}
+                  value={questionResponses[question.id] || ''}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Voice/Text Feedback Section */}
       <div className="space-y-4 mb-8">
@@ -294,22 +300,28 @@ export default function FeedbackForm({
           <div className="flex justify-center space-x-4 mb-6">
             <button
               onClick={() => setFeedbackType('voice')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 
-                ${feedbackType === 'voice'
-                  ? 'bg-[#657567] text-white'
-                  : 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50'
-                }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
+              style={{
+                backgroundColor: feedbackType === 'voice' ? companyData?.primary_color || '#657567' : 'transparent',
+                color: feedbackType === 'voice' ? 'white' : companyData?.primary_color || '#657567',
+                borderWidth: '2px',
+                borderStyle: 'solid',
+                borderColor: companyData?.primary_color || '#657567'
+              }}
             >
               <Mic className="w-5 h-5" />
               Voice Feedback
             </button>
             <button
               onClick={() => setFeedbackType('text')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
-                ${feedbackType === 'text'
-                  ? 'bg-[#657567] text-white'
-                  : 'border-2 border-[#657567] text-[#657567] hover:bg-gray-50'
-                }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
+              style={{
+                backgroundColor: feedbackType === 'text' ? companyData?.primary_color || '#657567' : 'transparent',
+                color: feedbackType === 'text' ? 'white' : companyData?.primary_color || '#657567',
+                borderWidth: '2px',
+                borderStyle: 'solid',
+                borderColor: companyData?.primary_color || '#657567'
+              }}
             >
               <MessageSquare className="w-5 h-5" />
               Text Feedback
@@ -325,15 +337,28 @@ export default function FeedbackForm({
             <AudioRecorder 
               onRecordingComplete={setAudioBlob}
               ref={audioRecorderRef}
+              companyColor={companyData?.primary_color || '#657567'}
             />
           </div>
         ) : campaignData?.settings.allowText ? (
           <div>
             <textarea
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#657567] focus:border-[#657567] font-manrope h-32"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-32 focus:outline-none"
               value={textFeedback}
               onChange={(e) => setTextFeedback(e.target.value)}
               placeholder="Please share your thoughts..."
+              style={{
+                borderColor: 'rgb(209, 213, 219)' // Default gray-300
+              }}
+              onFocus={(e) => {
+                const color = companyData?.primary_color || '#657567';
+                e.target.style.borderColor = color;
+                e.target.style.boxShadow = `0 0 0 2px ${color}33`;
+              }}
+              onBlur={(e) => {
+                e.target.style.boxShadow = 'none';
+                e.target.style.borderColor = 'rgb(209, 213, 219)';
+              }}
             />
           </div>
         ) : null}
@@ -346,13 +371,17 @@ export default function FeedbackForm({
             type="checkbox"
             checked={consent}
             onChange={(e) => setConsent(e.target.checked)}
-            className="mt-1.5 h-4 w-4 rounded border-gray-300 text-[#657567] focus:ring-[#657567]"
+            className="mt-1.5 h-4 w-4 rounded border-gray-300 focus:ring-2 focus:outline-none"
+            style={{
+              borderColor: 'rgb(209, 213, 219)',
+              accentColor: companyData?.primary_color || '#657567'
+            }}
           />
           <span className="text-sm text-gray-600 font-manrope">
             I consent to {companyData?.name || 'the company'} collecting and processing my feedback
             {feedbackType === 'voice' && ' and voice recording'}, 
             including processing on US-based servers. I understand this data will be used to improve products and services. 
-            View our full <a href="/privacy" className="text-[#657567] hover:underline">Privacy Policy</a>.
+            View our full <a href="/privacy" style={{ color: companyData?.primary_color || '#657567' }} className="hover:underline">Privacy Policy</a>.
           </span>
         </label>
 
@@ -365,9 +394,10 @@ export default function FeedbackForm({
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full bg-[#657567] hover:bg-[#4d594d] disabled:bg-gray-300 disabled:cursor-not-allowed 
+          className="w-full disabled:bg-gray-300 disabled:cursor-not-allowed 
                    text-white font-manrope font-semibold py-3 px-4 rounded-lg 
                    flex items-center justify-center gap-2 transition-colors duration-200"
+          style={{ backgroundColor: isSubmitting ? undefined : companyData?.primary_color || '#657567' }}
         >
           {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
         </button>

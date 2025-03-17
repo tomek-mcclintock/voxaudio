@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import { useCompany } from '@/lib/contexts/CompanyContext';
-import { Plus, Edit2, Trash2, CheckCircle, XCircle, UserPlus, Shield, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, XCircle, UserPlus, Shield, Users, Building } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import CompanyProfileForm from '@/components/CompanyProfileForm';
 
 interface User {
   id: string;
@@ -272,7 +273,7 @@ export default function SettingsPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            <Shield className="w-5 h-5 mr-2" />
+            <Building className="w-5 h-5 mr-2" />
             Company Profile
           </button>
         </div>
@@ -501,9 +502,7 @@ export default function SettingsPage() {
       {activeTab === 'company' && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium mb-4">Company Profile</h2>
-          <p className="text-gray-600 mb-4">
-            Coming soon! This section will allow you to update your company profile, branding, and preferences.
-          </p>
+          <CompanyProfileForm company={company} />
         </div>
       )}
     </div>
