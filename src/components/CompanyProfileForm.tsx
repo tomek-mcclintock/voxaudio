@@ -82,7 +82,7 @@ export default function CompanyProfileForm({ company }: CompanyProfileFormProps)
     } finally {
       setIsUploading(false);
     }
-  };  
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,13 +94,12 @@ export default function CompanyProfileForm({ company }: CompanyProfileFormProps)
       // First upload the logo if there is one
       const logoUrl = await uploadLogo();
       
-      // Update the company profile
+      // Update the company profile - REMOVED updated_at field
       const { error: updateError } = await supabase
         .from('companies')
         .update({
           primary_color: primaryColor,
-          logo_url: logoUrl,
-          updated_at: new Date().toISOString()
+          logo_url: logoUrl
         })
         .eq('id', company.id);
       
