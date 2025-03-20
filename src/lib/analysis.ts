@@ -73,7 +73,7 @@ export async function generateDailySummary(companyId: string, dateStr?: string) 
     // Analyze feedback using GPT-4
     console.log('Analyzing feedback with GPT-4...');
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -202,7 +202,7 @@ export async function generateMonthlySummary(companyId: string) {
     if (transcriptions) {
       console.log('Analyzing monthly feedback with GPT-4...');
       const response = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",

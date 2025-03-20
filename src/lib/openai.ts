@@ -25,7 +25,7 @@ export async function analyzeFeedback(text: string): Promise<{
   themes: string[];
 }> {
   const response = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
