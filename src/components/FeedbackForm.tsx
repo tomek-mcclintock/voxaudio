@@ -2,12 +2,12 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { useTranslation } from 'next-i18next';
 import AudioRecorder, { AudioRecorderRef } from './AudioRecorder';
 import { Mic, MessageSquare } from 'lucide-react';
 import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
 import type { Campaign, CampaignQuestion } from '@/types/campaign';
 import { TextQuestion, RatingQuestion, MultipleChoiceQuestion, YesNoQuestion } from './questions/QuestionTypes';
+import { translate } from '@/lib/translations';
 
 interface FeedbackFormProps {
   orderId: string;
@@ -60,8 +60,13 @@ export default function FeedbackForm({
   companyData,
   campaignData 
 }: FeedbackFormProps) {
-  // Use next-i18next for translations
-  const { t, i18n } = useTranslation('common');
+  // Get language from campaign or default to English
+  const language = campaignData?.language || 'en';
+  
+  // Helper function for translations
+  const t = (key: string, replacements: Record<string, string> = {}) => {
+    return translate(language, key, replacements);
+  };
   
   const [npsScore, setNpsScore] = useState<number | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -76,13 +81,6 @@ export default function FeedbackForm({
   const [consent, setConsent] = useState(false);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
   const [localOrderId] = useState(orderId); // No setState function, making it read-only
-
-  // Set the correct language based on campaign settings
-  React.useEffect(() => {
-    if (campaignData?.language && i18n.language !== campaignData.language) {
-      i18n.changeLanguage(campaignData.language);
-    }
-  }, [campaignData?.language, i18n]);
 
   const handleQuestionResponse = (questionId: string, value: any) => {
     console.log(`Setting response for question ${questionId}:`, value);
@@ -225,7 +223,7 @@ export default function FeedbackForm({
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
       <h1 className="font-lora text-3xl text-gray-800 mb-8">
         {companyData?.name ? 
-          t('form.title', { companyName: companyData.name }) :
+          t('form.title').replace('With Us', `With ${companyData.name}`) : 
           t('form.title')}
       </h1>
 
@@ -394,8 +392,8 @@ export default function FeedbackForm({
             {t('form.consentText', { 
               companyName: companyData?.name || t('form.theCompany'),
               voiceConsent: feedbackType === 'voice' ? t('form.andVoiceRecording') : ''
-            })}
-            <a href="/privacy" style={{ color: companyData?.primary_color || '#657567' }} className="hover:underline"> {t('form.privacyPolicy')}</a>.
+            })}{' '}
+            <a href="/privacy" style={{ color: companyData?.primary_color || '#657567' }} className="hover:underline">{t('form.privacyPolicy')}</a>.
           </span>
         </label>
 

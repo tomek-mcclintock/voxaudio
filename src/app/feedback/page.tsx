@@ -9,14 +9,17 @@ import type { Campaign } from '@/types/campaign';
 export default async function FeedbackPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const supabase = createServerComponentClient({ cookies });
   let companyData = null;
   let campaignData = null;
 
-  // Log all URL parameters for debugging
-  console.log('URL parameters:', searchParams);
+  // Helper to get param as string
+  const getParamAsString = (key: string): string => {
+    const value = searchParams[key];
+    return typeof value === 'string' ? value : Array.isArray(value) ? value[0] || '' : '';
+  };
 
   // Find the order ID parameter regardless of case
   const orderIdParam = Object.keys(searchParams).find(
@@ -25,22 +28,20 @@ export default async function FeedbackPage({
   
   // Get the order ID from the case-insensitive parameter or fallback to 'id'
   const orderId = orderIdParam 
-    ? searchParams[orderIdParam] 
-    : (searchParams.id || '');
+    ? getParamAsString(orderIdParam) 
+    : (getParamAsString('id') || '');
   
-  console.log('Captured OrderID:', orderId);
-
   // Get company ID (cid) parameter
   const cidParam = Object.keys(searchParams).find(
     key => key.toLowerCase() === 'cid'
   );
-  const companyId = cidParam ? searchParams[cidParam] : '';
+  const companyId = cidParam ? getParamAsString(cidParam) : '';
 
   // Get campaign parameter
   const campaignParam = Object.keys(searchParams).find(
     key => key.toLowerCase() === 'campaign'
   );
-  const campaignId = campaignParam ? searchParams[campaignParam] : '';
+  const campaignId = campaignParam ? getParamAsString(campaignParam) : '';
 
   if (companyId) {
     // Get company data
@@ -122,4 +123,4 @@ export default async function FeedbackPage({
       </main>
     </div>
   );
-}
+} 

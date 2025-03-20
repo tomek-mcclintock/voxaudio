@@ -1,5 +1,3 @@
-const { i18n } = require('./next-i18next.config');
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -12,10 +10,10 @@ const nextConfig = {
     },
   },
   output: 'standalone',
+  // Add this images configuration
   images: {
     domains: ['naavavnfezatboofkdvr.supabase.co'],
   },
-  i18n,
 }
 
 module.exports = nextConfig
