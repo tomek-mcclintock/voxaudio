@@ -6,6 +6,7 @@ import { Plus, Trash2, GripVertical, Mic, Type } from 'lucide-react';
 import type { CampaignQuestion, QuestionType } from '@/types/campaign';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
+import '@/styles/quill.css';
 
 // Dynamically import React Quill with no SSR to avoid hydration issues
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });

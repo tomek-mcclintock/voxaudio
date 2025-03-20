@@ -10,7 +10,7 @@ interface VoiceTextQuestionProps {
   textValue: string;
   onTextChange: (value: string) => void;
   onVoiceRecording: (blob: Blob | null) => void;
-  companyColor?: string;
+  companyColor?: string | null;
 }
 
 export default function VoiceTextQuestion({
@@ -21,7 +21,7 @@ export default function VoiceTextQuestion({
   companyColor = '#657567'
 }: VoiceTextQuestionProps) {
   const [responseType, setResponseType] = useState<'text' | 'voice'>(
-    (question.allowVoice && !question.allowText) ? 'voice' : 'text'
+    (question.allowVoice) ? 'voice' : 'text'
   );
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -115,7 +115,7 @@ export default function VoiceTextQuestion({
             <AudioRecorder
               onRecordingComplete={handleRecordingComplete}
               ref={audioRecorderRef}
-              companyColor={companyColor}
+              companyColor={companyColor || '#657567'}
             />
           ) : (
             <div className="flex flex-col items-center gap-4">
@@ -123,7 +123,7 @@ export default function VoiceTextQuestion({
                 <button
                   onClick={togglePlayback}
                   className="p-3 rounded-full transition-colors duration-200"
-                  style={{ backgroundColor: companyColor }}
+                  style={{ backgroundColor: companyColor || '#657567' }}
                   aria-label={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (

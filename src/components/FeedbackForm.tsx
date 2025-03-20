@@ -259,7 +259,12 @@ export default function FeedbackForm({
 
   // Function to render HTML content safely
   const renderHtml = (html: string) => {
-    return { __html: html };
+    // Make sure we preserve list formatting
+    const sanitizedHtml = html
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+    return { __html: sanitizedHtml };
   };
 
   return (
@@ -306,11 +311,10 @@ export default function FeedbackForm({
           <h3 className="font-manrope font-semibold text-gray-700">{t('form.additionalQuestions')}</h3>
           {campaignData.questions.map((question: CampaignQuestion) => (
             <div key={question.id} className="space-y-2">
-              <div 
-                className="block font-manrope text-gray-700"
-                dangerouslySetInnerHTML={renderHtml(question.formattedText || question.text)}
-              />
-              {question.required && <span className="text-red-500 ml-1">*</span>}
+              <div className="block font-manrope text-gray-700">
+                <span dangerouslySetInnerHTML={renderHtml(question.formattedText || question.text)} />
+                {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
+              </div>
               
               {question.type === 'text' && (
                 <TextQuestion
@@ -350,7 +354,7 @@ export default function FeedbackForm({
                   textValue={questionResponses[question.id] || ''}
                   onTextChange={(value) => handleQuestionResponse(question.id, value)}
                   onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
-                  companyColor={companyData?.primary_color || '#657567'} // Ensure it's never null
+                  companyColor={companyData?.primary_color || '#657567'}
                 />
               )}
             </div>
