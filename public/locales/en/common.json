@@ -1,0 +1,18 @@
+{
+    "form": {
+      "title": "Share Your Experience With Us",
+      "npsQuestion": "How likely are you to recommend us to friends and family?",
+      "notLikely": "Not likely",
+      "veryLikely": "Very likely",
+      "additionalFeedback": "Additional feedback:",
+      "voiceFeedback": "Voice Feedback",
+      "textFeedback": "Text Feedback",
+      "recordLabel": "Record your feedback (max 5 minutes):",
+      "textareaPlaceholder": "Please share your thoughts...",
+      "submitButton": "Submit Feedback",
+      "consentText": "I consent to {companyName} collecting and processing my feedback and voice recording, including processing on US-based servers. I understand this data will be used to improve products and services.",
+      "privacyPolicy": "Privacy Policy",
+      "thankYouTitle": "Thank You!",
+      "thankYouText": "Your feedback has been recorded."
+    }
+  }

@@ -27,6 +27,7 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
     allowText: true,
     ...initialData?.settings
   });
+  const [language, setLanguage] = useState(initialData?.language || 'en');
 
   const addQuestion = (type: QuestionType) => {
     const newQuestion: CampaignQuestion = {
@@ -82,15 +83,14 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
         ...settings,
         allowText: settings.allowText || !settings.allowVoice,
       },
-      include_additional_questions: includeAdditionalQuestions
+      include_additional_questions: includeAdditionalQuestions,
+      language
     };
     
     console.log('Client side - about to submit:', submitData);
-    console.log('NPS Question value:', npsQuestion);  // Check the specific value
+    console.log('NPS Question value:', npsQuestion);
     onSubmit(submitData);
   };
-
-
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -126,6 +126,27 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Language Settings */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Language Settings</h3>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Feedback Page Language
+          </label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+          >
+            <option value="en">English</option>
+            <option value="de">German (Deutsch)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            This sets the language for the customer feedback page.
+          </p>
         </div>
       </div>
 

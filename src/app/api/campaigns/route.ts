@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
             allowVoice: true,
             allowText: true
           },
+          language: campaignData.language || 'en', // Add language field
           active: true
         }
       ])

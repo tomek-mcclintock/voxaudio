@@ -33,4 +33,5 @@ export interface Campaign {
     allowText: boolean;
   };
   created_at: string;
+  language?: string; // Add this line for language support
 }

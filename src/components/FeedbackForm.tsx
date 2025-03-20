@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
+import { useTranslation } from 'next-i18next';
 import AudioRecorder, { AudioRecorderRef } from './AudioRecorder';
 import { Mic, MessageSquare } from 'lucide-react';
 import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
@@ -59,6 +60,9 @@ export default function FeedbackForm({
   companyData,
   campaignData 
 }: FeedbackFormProps) {
+  // Use next-i18next for translations
+  const { t, i18n } = useTranslation('common');
+  
   const [npsScore, setNpsScore] = useState<number | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [textFeedback, setTextFeedback] = useState('');
@@ -72,6 +76,13 @@ export default function FeedbackForm({
   const [consent, setConsent] = useState(false);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
   const [localOrderId] = useState(orderId); // No setState function, making it read-only
+
+  // Set the correct language based on campaign settings
+  React.useEffect(() => {
+    if (campaignData?.language && i18n.language !== campaignData.language) {
+      i18n.changeLanguage(campaignData.language);
+    }
+  }, [campaignData?.language, i18n]);
 
   const handleQuestionResponse = (questionId: string, value: any) => {
     console.log(`Setting response for question ${questionId}:`, value);
@@ -90,12 +101,12 @@ export default function FeedbackForm({
     console.log("Starting submission with questionResponses:", questionResponses);
     console.log("Campaign Data:", campaignData);  
     if (!consent) {
-      setError('Please accept the consent notice to submit feedback');
+      setError(t('form.consentRequired'));
       return;
     }
   
     if (campaignData?.include_nps && !npsScore) {
-      setError('Please provide an NPS score');
+      setError(t('form.npsRequired'));
       return;
     }
   
@@ -105,7 +116,7 @@ export default function FeedbackForm({
       );
   
       if (missingRequired) {
-        setError('Please answer all required questions');
+        setError(t('form.requiredQuestions'));
         return;
       }
     }
@@ -167,7 +178,7 @@ export default function FeedbackForm({
       setSubmitted(true);
     } catch (err) {
       console.error('Submission error:', err);
-      setError('Failed to submit feedback. Please try again.');
+      setError(t('form.submissionError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -176,8 +187,12 @@ export default function FeedbackForm({
   if (submitted) {
     return (
       <div className="text-center p-8">
-        <h2 className="font-lora text-2xl text-gray-800 mb-4">Thank You!</h2>
-        <p className="font-manrope text-gray-600">Your feedback has been recorded.</p>
+        <h2 className="font-lora text-2xl text-gray-800 mb-4">
+          {t('form.thankYouTitle')}
+        </h2>
+        <p className="font-manrope text-gray-600">
+          {t('form.thankYouText')}
+        </p>
       </div>
     );
   }
@@ -185,7 +200,6 @@ export default function FeedbackForm({
   // Function to determine button color based on NPS score
   const getScoreColor = (score: number) => {
     const primaryColor = companyData?.primary_color || '#657567';
-    const scoreLightColor = `${primaryColor}33`; // Add 33 (20% opacity) to the hex color
     
     if (score <= 6) return npsScore === null
       ? 'bg-red-500 text-white hover:bg-red-600'
@@ -198,27 +212,28 @@ export default function FeedbackForm({
       ? 'bg-yellow-500 text-white ring-2 ring-yellow-500 ring-offset-2'
       : 'bg-yellow-200 text-yellow-700 opacity-75';
     
-      if (npsScore === null) {
-        return 'bg-green-500 text-white hover:bg-green-600';
-      } else if (npsScore === score) {
-        return 'bg-green-500 text-white ring-2 ring-green-500 ring-offset-2';
-      } else {
-        return 'bg-green-200 text-green-700 opacity-75';
-      }
-    };
-    
+    if (npsScore === null) {
+      return 'bg-green-500 text-white hover:bg-green-600';
+    } else if (npsScore === score) {
+      return 'bg-green-500 text-white ring-2 ring-green-500 ring-offset-2';
+    } else {
+      return 'bg-green-200 text-green-700 opacity-75';
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
       <h1 className="font-lora text-3xl text-gray-800 mb-8">
-        Share Your {companyData?.name || 'Experience With Us'} Experience
+        {companyData?.name ? 
+          t('form.title', { companyName: companyData.name }) :
+          t('form.title')}
       </h1>
 
       {/* NPS Question */}
       {campaignData?.include_nps && (
         <div className="mb-8">
           <p className="font-manrope text-gray-700 mb-4">
-            {campaignData.nps_question || 'How likely are you to recommend us to friends and family?'}
+            {campaignData.nps_question || t('form.npsQuestion')}
           </p>
           <div className="flex justify-between gap-2 mb-2">
             {[...Array(10)].map((_, i) => {
@@ -230,7 +245,6 @@ export default function FeedbackForm({
                   onClick={() => setNpsScore(score)}
                   className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
                     ${getScoreColor(score)}`}
-                    style={{}} // Remove the conditional style for scores 9 and 10
                 >
                   {score}
                 </button>
@@ -238,8 +252,8 @@ export default function FeedbackForm({
             })}
           </div>
           <div className="flex justify-between mt-2">
-            <span className="text-sm text-gray-500 font-manrope">Not likely</span>
-            <span className="text-sm text-gray-500 font-manrope">Very likely</span>
+            <span className="text-sm text-gray-500 font-manrope">{t('form.notLikely')}</span>
+            <span className="text-sm text-gray-500 font-manrope">{t('form.veryLikely')}</span>
           </div>
         </div>
       )}
@@ -247,7 +261,7 @@ export default function FeedbackForm({
       {/* Additional Questions Section */}
       {campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (
         <div className="space-y-6 mb-8">
-          <h3 className="font-manrope font-semibold text-gray-700">Additional Questions</h3>
+          <h3 className="font-manrope font-semibold text-gray-700">{t('form.additionalQuestions')}</h3>
           {campaignData.questions.map((question: CampaignQuestion) => (
             <div key={question.id} className="space-y-2">
               <label className="block font-manrope text-gray-700">
@@ -293,7 +307,7 @@ export default function FeedbackForm({
 
       {/* Voice/Text Feedback Section */}
       <div className="space-y-4 mb-8">
-        <p className="font-manrope font-semibold text-gray-700">Additional feedback:</p>
+        <p className="font-manrope font-semibold text-gray-700">{t('form.additionalFeedback')}</p>
         
         {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
           <div className="flex justify-center space-x-4 mb-6">
@@ -309,7 +323,7 @@ export default function FeedbackForm({
               }}
             >
               <Mic className="w-5 h-5" />
-              Voice Feedback
+              {t('form.voiceFeedback')}
             </button>
             <button
               onClick={() => setFeedbackType('text')}
@@ -323,7 +337,7 @@ export default function FeedbackForm({
               }}
             >
               <MessageSquare className="w-5 h-5" />
-              Text Feedback
+              {t('form.textFeedback')}
             </button>
           </div>
         )}
@@ -331,7 +345,7 @@ export default function FeedbackForm({
         {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
           <div>
             <p className="text-gray-600 mb-4 font-manrope">
-              Record your feedback (max 5 minutes):
+              {t('form.recordLabel')}
             </p>
             <AudioRecorder 
               onRecordingComplete={setAudioBlob}
@@ -345,7 +359,7 @@ export default function FeedbackForm({
               className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-32 focus:outline-none"
               value={textFeedback}
               onChange={(e) => setTextFeedback(e.target.value)}
-              placeholder="Please share your thoughts..."
+              placeholder={t('form.textareaPlaceholder')}
               style={{
                 borderColor: 'rgb(209, 213, 219)' // Default gray-300
               }}
@@ -377,10 +391,11 @@ export default function FeedbackForm({
             }}
           />
           <span className="text-sm text-gray-600 font-manrope">
-            I consent to {companyData?.name || 'the company'} collecting and processing my feedback
-            {feedbackType === 'voice' && ' and voice recording'}, 
-            including processing on US-based servers. I understand this data will be used to improve products and services. 
-            View our full <a href="/privacy" style={{ color: companyData?.primary_color || '#657567' }} className="hover:underline">Privacy Policy</a>.
+            {t('form.consentText', { 
+              companyName: companyData?.name || t('form.theCompany'),
+              voiceConsent: feedbackType === 'voice' ? t('form.andVoiceRecording') : ''
+            })}
+            <a href="/privacy" style={{ color: companyData?.primary_color || '#657567' }} className="hover:underline"> {t('form.privacyPolicy')}</a>.
           </span>
         </label>
 
@@ -398,7 +413,7 @@ export default function FeedbackForm({
                    flex items-center justify-center gap-2 transition-colors duration-200"
           style={{ backgroundColor: isSubmitting ? undefined : companyData?.primary_color || '#657567' }}
         >
-          {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
+          {isSubmitting ? t('form.submitting') : t('form.submitButton')}
         </button>
       </div>
     </div>

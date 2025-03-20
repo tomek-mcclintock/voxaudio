@@ -1,0 +1,18 @@
+{
+  "form": {
+    "title": "Teilen Sie Ihre Erfahrung mit uns",
+    "npsQuestion": "Wie wahrscheinlich ist es, dass Sie uns Freunden und Familie empfehlen würden?",
+    "notLikely": "Unwahrscheinlich",
+    "veryLikely": "Sehr wahrscheinlich",
+    "additionalFeedback": "Zusätzliches Feedback:",
+    "voiceFeedback": "Sprachfeedback",
+    "textFeedback": "Textfeedback",
+    "recordLabel": "Zeichnen Sie Ihr Feedback auf (max. 5 Minuten):",
+    "textareaPlaceholder": "Bitte teilen Sie Ihre Gedanken mit...",
+    "submitButton": "Feedback abschicken",
+    "consentText": "Ich stimme zu, dass {companyName} mein Feedback und meine Sprachaufnahme sammelt und verarbeitet, einschließlich der Verarbeitung auf US-basierten Servern. Ich verstehe, dass diese Daten zur Verbesserung von Produkten und Dienstleistungen verwendet werden.",
+    "privacyPolicy": "Datenschutzrichtlinie",
+    "thankYouTitle": "Vielen Dank!",
+    "thankYouText": "Ihr Feedback wurde aufgezeichnet."
+  }
+}
