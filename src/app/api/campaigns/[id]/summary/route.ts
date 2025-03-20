@@ -28,10 +28,19 @@ export async function POST(
 
     if (userError) throw userError;
 
-    // Get campaign details to verify company access
+    // Get company information
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', userData.company_id)
+      .single();
+
+    if (companyError) throw companyError;
+
+    // Get campaign details including campaign questions
     const { data: campaign, error: campaignError } = await supabase
       .from('feedback_campaigns')
-      .select('*')
+      .select('*, questions')
       .eq('id', campaignId)
       .eq('company_id', userData.company_id)
       .single();
@@ -40,10 +49,18 @@ export async function POST(
       throw campaignError;
     }
 
-    // Get all feedback for this campaign
+    // Get all feedback for this campaign with question responses
     const { data: feedbackEntries, error: feedbackError } = await supabase
       .from('feedback_submissions')
-      .select('nps_score, transcription, voice_file_url')
+      .select(`
+        nps_score, 
+        transcription, 
+        voice_file_url,
+        question_responses (
+          question_id,
+          response_value
+        )
+      `)
       .eq('campaign_id', campaignId)
       .eq('company_id', userData.company_id);
 
@@ -57,15 +74,61 @@ export async function POST(
       });
     }
 
-    // Combine all feedback texts
+    // Prepare context information for the AI
+    const companyName = company.name;
+    const campaignName = campaign.name;
+    
+    // Format the questions that were asked
+    let questionsInfo = '';
+    if (campaign.questions && campaign.questions.length > 0) {
+      questionsInfo = 'Questions asked in this campaign:\n';
+      campaign.questions.forEach((q: any) => {
+        questionsInfo += `- ${q.text}\n`;
+      });
+    }
+    
+    if (campaign.include_nps) {
+      const npsQuestion = campaign.nps_question || 'How likely are you to recommend us to a friend or colleague?';
+      questionsInfo += `- ${npsQuestion} (NPS score 1-10)\n`;
+    }
+
+    // Combine all feedback texts with question responses
     const feedbackTexts = feedbackEntries
       .map(entry => {
-        const text = entry.transcription || '';
-        const scoreInfo = entry.nps_score !== null ? `[NPS: ${entry.nps_score}] ` : '';
-        return text ? `${scoreInfo}${text}` : null;
+        let feedbackText = '';
+        
+        // Add NPS score if available
+        if (entry.nps_score !== null) {
+          feedbackText += `[NPS Score: ${entry.nps_score}/10] `;
+        }
+        
+        // Add transcription if available
+        if (entry.transcription) {
+          feedbackText += entry.transcription;
+        }
+        
+        // Add question responses if available
+        if (entry.question_responses && entry.question_responses.length > 0) {
+          feedbackText += '\nQuestion responses:\n';
+          
+          entry.question_responses.forEach((response: any) => {
+            // Find the question text for this response
+            let questionText = 'Question';
+            if (campaign.questions) {
+              const question = campaign.questions.find((q: any) => q.id === response.question_id);
+              if (question) {
+                questionText = question.text;
+              }
+            }
+            
+            feedbackText += `- ${questionText}: ${response.response_value}\n`;
+          });
+        }
+        
+        return feedbackText.trim() ? feedbackText : null;
       })
       .filter(text => text !== null)
-      .join('\n\n');
+      .join('\n\n---\n\n');
 
     if (!feedbackTexts) {
       return NextResponse.json({
@@ -73,13 +136,28 @@ export async function POST(
       });
     }
 
+    // Create a context-aware system prompt
+    const systemPrompt = `
+You are analyzing customer feedback for ${companyName}'s campaign "${campaignName}".
+
+${questionsInfo}
+
+Create a concise paragraph (150-200 words) summarizing:
+1. The main patterns and themes in the feedback
+2. Key issues or concerns mentioned by customers
+3. Positive aspects highlighted by customers (if any)
+4. Actionable insights that ${companyName} could implement
+
+Focus on being specific and data-driven. Mention the frequency of common themes when possible (e.g., "40% of customers mentioned...").
+`;
+
     // Use OpenAI to analyze the feedback
     const response = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: "You are analyzing customer feedback about returned rugs. Create a concise paragraph (150-200 words) summarizing the main reasons customers are returning rugs, common patterns in their feedback, and actionable insights for the company. Focus on specific, data-driven findings, not general advice."
+          content: systemPrompt.trim()
         },
         {
           role: "user",
