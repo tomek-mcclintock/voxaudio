@@ -1,10 +1,15 @@
 // src/components/CampaignForm.tsx
 'use client';
 
-import { useState } from 'react';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, GripVertical, Mic, Type } from 'lucide-react';
 import type { CampaignQuestion, QuestionType } from '@/types/campaign';
 import { v4 as uuidv4 } from 'uuid';
+import dynamic from 'next/dynamic';
+
+// Dynamically import React Quill with no SSR to avoid hydration issues
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
+import 'react-quill/dist/quill.snow.css'; // Import Quill styles
 
 interface CampaignFormProps {
   onSubmit: (data: any) => void;
@@ -28,12 +33,27 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
     ...initialData?.settings
   });
   const [language, setLanguage] = useState(initialData?.language || 'en');
+  
+  // Quill editor modules configuration
+  const quillModules = {
+    toolbar: [
+      ['bold', 'italic'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      ['clean']
+    ]
+  };
+  
+  // Quill editor formats
+  const quillFormats = [
+    'bold', 'italic', 'list', 'bullet'
+  ];
 
   const addQuestion = (type: QuestionType) => {
     const newQuestion: CampaignQuestion = {
       id: uuidv4(),
       type,
       text: '',
+      formattedText: '',
       required: false
     };
 
@@ -47,6 +67,10 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
         minLabel: 'Poor',
         maxLabel: 'Excellent'
       };
+    }
+    if (type === 'voice_text') {
+      newQuestion.allowVoice = true;
+      newQuestion.allowText = true;
     }
 
     setQuestions([...questions, newQuestion]);
@@ -168,19 +192,23 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
         {includeNps && (
           <div>
             <label className="block text-sm font-medium text-gray-700">NPS Question Text</label>
-            <input
-              type="text"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              value={npsQuestion}
-              onChange={(e) => setNpsQuestion(e.target.value)}
-            />
+            <div className="mt-1">
+              <ReactQuill
+                value={npsQuestion}
+                onChange={setNpsQuestion}
+                modules={quillModules}
+                formats={quillFormats}
+                theme="snow"
+                className="bg-white"
+              />
+            </div>
           </div>
         )}
       </div>
 
       {/* Feedback Settings */}
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Feedback Settings</h3>
+        <h3 className="text-lg font-medium">General Feedback Settings</h3>
         <div className="space-y-2">
           <label className="flex items-center space-x-2">
             <input
@@ -247,6 +275,13 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
               >
                 Add Yes/No
               </button>
+              <button
+                type="button"
+                onClick={() => addQuestion('voice_text')}
+                className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+              >
+                Add Voice/Text Question
+              </button>
             </div>
 
             <div className="space-y-4">
@@ -255,13 +290,27 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
                   <div className="flex items-start gap-4">
                     <GripVertical className="w-5 h-5 text-gray-400 mt-2" />
                     <div className="flex-grow space-y-4">
-                      <input
-                        type="text"
-                        placeholder="Question text"
-                        className="w-full rounded-md border-gray-300 shadow-sm"
-                        value={question.text}
-                        onChange={(e) => updateQuestion(question.id, { text: e.target.value })}
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Question Text</label>
+                        <ReactQuill
+                          value={question.formattedText || question.text}
+                          onChange={(content) => {
+                            // Extract plain text from HTML (simple approach)
+                            const div = document.createElement('div');
+                            div.innerHTML = content;
+                            const plainText = div.textContent || div.innerText || '';
+                            
+                            updateQuestion(question.id, { 
+                              text: plainText, 
+                              formattedText: content 
+                            });
+                          }}
+                          modules={quillModules}
+                          formats={quillFormats}
+                          theme="snow"
+                          className="bg-white"
+                        />
+                      </div>
 
                       {question.type === 'multiple_choice' && question.options && (
                         <div className="space-y-2">
@@ -331,6 +380,36 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
                                 }
                               })}
                             />
+                          </div>
+                        </div>
+                      )}
+
+                      {question.type === 'voice_text' && (
+                        <div className="space-y-2">
+                          <p className="text-sm text-gray-600">Response Options:</p>
+                          <div className="flex space-x-4">
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={question.allowVoice ?? true}
+                                onChange={(e) => updateQuestion(question.id, { allowVoice: e.target.checked })}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="inline-flex items-center text-sm">
+                                <Mic className="w-4 h-4 mr-1" /> Allow Voice Response
+                              </span>
+                            </label>
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={question.allowText ?? true}
+                                onChange={(e) => updateQuestion(question.id, { allowText: e.target.checked })}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="inline-flex items-center text-sm">
+                                <Type className="w-4 h-4 mr-1" /> Allow Text Response
+                              </span>
+                            </label>
                           </div>
                         </div>
                       )}

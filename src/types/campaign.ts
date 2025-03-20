@@ -1,5 +1,5 @@
 // src/types/campaign.ts
-export type QuestionType = 'nps' | 'text' | 'rating' | 'multiple_choice' | 'yes_no';
+export type QuestionType = 'nps' | 'text' | 'rating' | 'multiple_choice' | 'yes_no' | 'voice_text';
 
 interface Scale {
   min: number;
@@ -12,9 +12,12 @@ export interface CampaignQuestion {
   id: string;
   type: QuestionType;
   text: string;
+  formattedText?: string; // New field for rich text content
   required: boolean;
   options?: string[]; // For multiple choice questions
   scale?: Scale; // For rating questions
+  allowVoice?: boolean; // Flag to indicate if voice responses are allowed
+  allowText?: boolean; // Flag to indicate if text responses are allowed
 }
 
 export interface Campaign {
@@ -33,5 +36,5 @@ export interface Campaign {
     allowText: boolean;
   };
   created_at: string;
-  language?: string; // Add this line for language support
+  language?: string;
 }

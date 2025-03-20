@@ -26,6 +26,20 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get('audio') as Blob | null;
     const textFeedback = formData.get('textFeedback') as string | null;
     const questionResponsesStr = formData.get('questionResponses') as string | null;
+    
+    // New fields for question voice recordings
+    const hasVoiceQuestions = formData.get('hasVoiceQuestions') === 'true';
+    const voiceQuestionIdsStr = formData.get('voiceQuestionIds') as string | null;
+    let voiceQuestionIds: string[] = [];
+    
+    if (hasVoiceQuestions && voiceQuestionIdsStr) {
+      try {
+        voiceQuestionIds = JSON.parse(voiceQuestionIdsStr);
+        console.log('Voice question IDs:', voiceQuestionIds);
+      } catch (e) {
+        console.error('Failed to parse voice question IDs:', e);
+      }
+    }
 
     console.log('Order ID from form:', orderId);
     console.log('Raw questionResponsesStr:', questionResponsesStr);
@@ -49,7 +63,9 @@ export async function POST(request: NextRequest) {
       hasAudio: !!audioFile,
       hasText: !!textFeedback,
       hasQuestionResponses: !!questionResponses,
-      questionResponses
+      questionResponses,
+      hasVoiceQuestions,
+      voiceQuestionIds
     });
 
     // Validate basic required fields
@@ -81,9 +97,10 @@ export async function POST(request: NextRequest) {
     let transcription = null;
     let sentiment = null;
 
+    // Process main audio feedback (related to NPS)
     if (audioFile) {
       try {
-        console.log('Processing audio file...');
+        console.log('Processing main audio file...');
         const arrayBuffer = await audioFile.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
@@ -117,6 +134,44 @@ export async function POST(request: NextRequest) {
         console.log('Analysis complete:', sentiment);
       } catch (error) {
         console.error('Error analyzing text:', error);
+      }
+    }
+
+    // Process voice recordings for individual questions
+    const questionVoiceFiles: Record<string, string> = {};
+    const questionTranscriptions: Record<string, string> = {};
+    
+    if (hasVoiceQuestions && voiceQuestionIds.length > 0) {
+      console.log('Processing voice recordings for questions...');
+      
+      for (const questionId of voiceQuestionIds) {
+        const questionAudioFile = formData.get(`question_audio_${questionId}`) as Blob | null;
+        
+        if (questionAudioFile) {
+          try {
+            console.log(`Processing audio for question ${questionId}...`);
+            const arrayBuffer = await questionAudioFile.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            
+            // Upload to S3 with a distinct path
+            const filePath = await uploadVoiceRecording(
+              buffer, 
+              `${companyId}/${campaignId}/question_${questionId}_${orderId || 'no-order-id'}`
+            );
+            questionVoiceFiles[questionId] = filePath;
+            
+            // Transcribe the audio
+            const questionTranscription = await transcribeAudio(buffer);
+            if (questionTranscription) {
+              questionTranscriptions[questionId] = questionTranscription;
+            }
+            
+            console.log(`Processed audio for question ${questionId}, filePath: ${filePath}`);
+          } catch (error) {
+            console.error(`Error processing audio for question ${questionId}:`, error);
+            // Continue with other questions rather than failing the entire submission
+          }
+        }
       }
     }
 
@@ -169,30 +224,54 @@ export async function POST(request: NextRequest) {
     console.log('Feedback saved successfully:', feedback);
 
     // Save question responses if any
-    if (questionResponses && feedback) {
+    if ((questionResponses || Object.keys(questionTranscriptions).length > 0) && feedback) {
       console.log('About to save question responses. Feedback ID:', feedback.id);
       
-      // Format responses for insertion
-      const questionResponsesArray = Object.entries(questionResponses).map(([questionId, value]) => ({
-        feedback_submission_id: feedback.id,
-        question_id: questionId,
-        response_value: typeof value === 'string' ? value : JSON.stringify(value)
-      }));
+      // Format text responses for insertion
+      const questionResponsesArray = [];
+      
+      // Add text responses
+      if (questionResponses) {
+        for (const [questionId, value] of Object.entries(questionResponses)) {
+          questionResponsesArray.push({
+            feedback_submission_id: feedback.id,
+            question_id: questionId,
+            response_value: typeof value === 'string' ? value : JSON.stringify(value),
+            voice_file_url: questionVoiceFiles[questionId] || null,
+            transcription: questionTranscriptions[questionId] || null
+          });
+        }
+      }
+      
+      // Add voice-only responses (if not already in text responses)
+      for (const questionId of Object.keys(questionTranscriptions)) {
+        if (!questionResponses || !questionResponses[questionId]) {
+          questionResponsesArray.push({
+            feedback_submission_id: feedback.id,
+            question_id: questionId,
+            response_value: null, // No text response
+            voice_file_url: questionVoiceFiles[questionId] || null,
+            transcription: questionTranscriptions[questionId] || null
+          });
+        }
+      }
 
       console.log('Formatted responses for insertion:', questionResponsesArray);
 
-      // Attempt to save responses
-      const { data: savedResponses, error: responsesError } = await supabase
-        .from('question_responses')
-        .insert(questionResponsesArray)
-        .select();
+      if (questionResponsesArray.length > 0) {
+        // Attempt to save responses
+        const { data: savedResponses, error: responsesError } = await supabase
+          .from('question_responses')
+          .insert(questionResponsesArray)
+          .select();
 
-      if (responsesError) {
-        console.error('Failed to save question responses:', responsesError);
-        console.error('Error details:', responsesError.details);
-        console.error('Error message:', responsesError.message);
-      } else {
-        console.log('Successfully saved responses:', savedResponses);
+        if (responsesError) {
+          console.error('Failed to save question responses:', responsesError);
+          console.error('Error details:', responsesError.details);
+          console.error('Error message:', responsesError.message);
+        } else {
+          console.log('Successfully saved responses:', savedResponses);
+        }
       }
     } else {
       console.log('No question responses to save or no feedback ID available');
@@ -209,13 +288,23 @@ export async function POST(request: NextRequest) {
     if (sheetsConnection) {
       console.log('Found Google Sheets connection, syncing data...');
       try {
+        // Format data for sheets, including both text and voice transcriptions
+        const allResponses = { ...questionResponses };
+        
+        // Add transcriptions from voice responses
+        for (const [questionId, transcriptionText] of Object.entries(questionTranscriptions)) {
+          if (!allResponses[questionId]) {
+            allResponses[questionId] = `[Voice] ${transcriptionText}`;
+          }
+        }
+        
         const formattedData = formatFeedbackForSheets({
           created_at: feedback.created_at,
           order_id: orderIdToSave || 'N/A',
           nps_score: npsScore,
           transcription: transcription,
           sentiment: sentiment,
-          ...questionResponses && { responses: JSON.stringify(questionResponses) }
+          ...Object.keys(allResponses).length > 0 && { responses: JSON.stringify(allResponses) }
         });
 
         await appendToSheet(
@@ -236,7 +325,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true,
       feedback,
-      hasQuestionResponses: !!questionResponses
+      hasQuestionResponses: !!questionResponses || Object.keys(questionTranscriptions).length > 0
     });
   } catch (error) {
     console.error('Error processing feedback:', error);

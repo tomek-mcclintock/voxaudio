@@ -8,6 +8,7 @@ import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
 import type { Campaign, CampaignQuestion } from '@/types/campaign';
 import { TextQuestion, RatingQuestion, MultipleChoiceQuestion, YesNoQuestion } from './questions/QuestionTypes';
 import { translate } from '@/lib/translations';
+import VoiceTextQuestion from './questions/VoiceTextQuestion';
 
 interface FeedbackFormProps {
   orderId: string;
@@ -75,6 +76,8 @@ export default function FeedbackForm({
     campaignData?.settings?.allowVoice ? 'voice' : 'text'
   );
   const [questionResponses, setQuestionResponses] = useState<Record<string, any>>({});
+  // New state for voice recordings per question
+  const [questionVoiceRecordings, setQuestionVoiceRecordings] = useState<Record<string, Blob | null>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,10 +96,19 @@ export default function FeedbackForm({
       return updated;
     });
   };
+
+  const handleQuestionVoiceRecording = (questionId: string, audioBlob: Blob | null) => {
+    console.log(`Setting voice recording for question ${questionId}`);
+    setQuestionVoiceRecordings(prev => ({
+      ...prev,
+      [questionId]: audioBlob
+    }));
+  };
   
   const handleSubmit = async () => {
     console.log("Starting submission with orderID:", localOrderId);
     console.log("Starting submission with questionResponses:", questionResponses);
+    console.log("Starting submission with questionVoiceRecordings:", questionVoiceRecordings);
     console.log("Campaign Data:", campaignData);  
     if (!consent) {
       setError(t('form.consentRequired'));
@@ -110,7 +122,7 @@ export default function FeedbackForm({
   
     if (campaignData?.include_additional_questions) {
       const missingRequired = campaignData.questions.some(
-        q => q.required && !questionResponses[q.id]
+        q => q.required && !questionResponses[q.id] && !questionVoiceRecordings[q.id]
       );
   
       if (missingRequired) {
@@ -123,15 +135,20 @@ export default function FeedbackForm({
     setError(null);
     
     try {
+      // Stop any ongoing recordings
       if (audioRecorderRef.current) {
         audioRecorderRef.current.stopRecording();
       }
     
       const formData = new FormData();
-      if (feedbackType === 'voice' && audioBlob) {
-        formData.append('audio', audioBlob);
-      } else if (feedbackType === 'text' && textFeedback) {
-        formData.append('textFeedback', textFeedback);
+      
+      // Handle NPS additional feedback
+      if (campaignData?.include_nps) {
+        if (feedbackType === 'voice' && audioBlob) {
+          formData.append('audio', audioBlob);
+        } else if (feedbackType === 'text' && textFeedback) {
+          formData.append('textFeedback', textFeedback);
+        }
       }
       
       // Explicitly log the order ID we're adding to the form
@@ -146,11 +163,32 @@ export default function FeedbackForm({
         formData.append('npsScore', npsScore.toString());
       }
     
-      // Log question responses before submission
-      console.log('Question responses before submission:', questionResponses);
+      // Add text question responses
+      const textResponses: Record<string, any> = {};
+      Object.entries(questionResponses).forEach(([questionId, value]) => {
+        textResponses[questionId] = value;
+      });
       
-      if (Object.keys(questionResponses).length > 0) {
-        const responsesJson = JSON.stringify(questionResponses);
+      // Add info about voice recordings for questions
+      const voiceQuestionIds = Object.keys(questionVoiceRecordings);
+      if (voiceQuestionIds.length > 0) {
+        formData.append('hasVoiceQuestions', 'true');
+        formData.append('voiceQuestionIds', JSON.stringify(voiceQuestionIds));
+        
+        // Append each voice recording with a unique key
+        voiceQuestionIds.forEach(questionId => {
+          const blob = questionVoiceRecordings[questionId];
+          if (blob) {
+            formData.append(`question_audio_${questionId}`, blob);
+          }
+        });
+      }
+    
+      // Log question responses before submission
+      console.log('Text responses before submission:', textResponses);
+      
+      if (Object.keys(textResponses).length > 0) {
+        const responsesJson = JSON.stringify(textResponses);
         console.log('Stringified responses:', responsesJson);
         formData.append('questionResponses', responsesJson);
       }
@@ -219,6 +257,11 @@ export default function FeedbackForm({
     }
   };
 
+  // Function to render HTML content safely
+  const renderHtml = (html: string) => {
+    return { __html: html };
+  };
+
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
       <h1 className="font-lora text-3xl text-gray-800 mb-8">
@@ -230,9 +273,10 @@ export default function FeedbackForm({
       {/* NPS Question */}
       {campaignData?.include_nps && (
         <div className="mb-8">
-          <p className="font-manrope text-gray-700 mb-4">
-            {campaignData.nps_question || t('form.npsQuestion')}
-          </p>
+          <div 
+            className="font-manrope text-gray-700 mb-4"
+            dangerouslySetInnerHTML={renderHtml(campaignData.nps_question || t('form.npsQuestion'))}
+          />
           <div className="flex justify-between gap-2 mb-2">
             {[...Array(10)].map((_, i) => {
               const score = i + 1;
@@ -262,10 +306,11 @@ export default function FeedbackForm({
           <h3 className="font-manrope font-semibold text-gray-700">{t('form.additionalQuestions')}</h3>
           {campaignData.questions.map((question: CampaignQuestion) => (
             <div key={question.id} className="space-y-2">
-              <label className="block font-manrope text-gray-700">
-                {question.text}
-                {question.required && <span className="text-red-500 ml-1">*</span>}
-              </label>
+              <div 
+                className="block font-manrope text-gray-700"
+                dangerouslySetInnerHTML={renderHtml(question.formattedText || question.text)}
+              />
+              {question.required && <span className="text-red-500 ml-1">*</span>}
               
               {question.type === 'text' && (
                 <TextQuestion
@@ -298,82 +343,94 @@ export default function FeedbackForm({
                   onChange={(value) => handleQuestionResponse(question.id, value)}
                 />
               )}
+
+              {question.type === 'voice_text' && (
+                <VoiceTextQuestion
+                  question={question}
+                  textValue={questionResponses[question.id] || ''}
+                  onTextChange={(value) => handleQuestionResponse(question.id, value)}
+                  onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
+                  companyColor={companyData?.primary_color || '#657567'} // Ensure it's never null
+                />
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Voice/Text Feedback Section */}
-      <div className="space-y-4 mb-8">
-        <p className="font-manrope font-semibold text-gray-700">{t('form.additionalFeedback')}</p>
-        
-        {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
-          <div className="flex justify-center space-x-4 mb-6">
-            <button
-              onClick={() => setFeedbackType('voice')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
-              style={{
-                backgroundColor: feedbackType === 'voice' ? companyData?.primary_color || '#657567' : 'transparent',
-                color: feedbackType === 'voice' ? 'white' : companyData?.primary_color || '#657567',
-                borderWidth: '2px',
-                borderStyle: 'solid',
-                borderColor: companyData?.primary_color || '#657567'
-              }}
-            >
-              <Mic className="w-5 h-5" />
-              {t('form.voiceFeedback')}
-            </button>
-            <button
-              onClick={() => setFeedbackType('text')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
-              style={{
-                backgroundColor: feedbackType === 'text' ? companyData?.primary_color || '#657567' : 'transparent',
-                color: feedbackType === 'text' ? 'white' : companyData?.primary_color || '#657567',
-                borderWidth: '2px',
-                borderStyle: 'solid',
-                borderColor: companyData?.primary_color || '#657567'
-              }}
-            >
-              <MessageSquare className="w-5 h-5" />
-              {t('form.textFeedback')}
-            </button>
-          </div>
-        )}
+      {/* Voice/Text Feedback Section - Only shown if NPS is included */}
+      {campaignData?.include_nps && (
+        <div className="space-y-4 mb-8">
+          <p className="font-manrope font-semibold text-gray-700">{t('form.additionalFeedback')}</p>
+          
+          {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
+            <div className="flex justify-center space-x-4 mb-6">
+              <button
+                onClick={() => setFeedbackType('voice')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
+                style={{
+                  backgroundColor: feedbackType === 'voice' ? companyData?.primary_color || '#657567' : 'transparent',
+                  color: feedbackType === 'voice' ? 'white' : companyData?.primary_color || '#657567',
+                  borderWidth: '2px',
+                  borderStyle: 'solid',
+                  borderColor: companyData?.primary_color || '#657567'
+                }}
+              >
+                <Mic className="w-5 h-5" />
+                {t('form.voiceFeedback')}
+              </button>
+              <button
+                onClick={() => setFeedbackType('text')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
+                style={{
+                  backgroundColor: feedbackType === 'text' ? companyData?.primary_color || '#657567' : 'transparent',
+                  color: feedbackType === 'text' ? 'white' : companyData?.primary_color || '#657567',
+                  borderWidth: '2px',
+                  borderStyle: 'solid',
+                  borderColor: companyData?.primary_color || '#657567'
+                }}
+              >
+                <MessageSquare className="w-5 h-5" />
+                {t('form.textFeedback')}
+              </button>
+            </div>
+          )}
 
-        {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
-          <div>
-            <p className="text-gray-600 mb-4 font-manrope">
-              {t('form.recordLabel')}
-            </p>
-            <AudioRecorder 
-              onRecordingComplete={setAudioBlob}
-              ref={audioRecorderRef}
-              companyColor={companyData?.primary_color || '#657567'}
-            />
-          </div>
-        ) : campaignData?.settings.allowText ? (
-          <div>
-            <textarea
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-32 focus:outline-none"
-              value={textFeedback}
-              onChange={(e) => setTextFeedback(e.target.value)}
-              placeholder={t('form.textareaPlaceholder')}
-              style={{
-                borderColor: 'rgb(209, 213, 219)' // Default gray-300
-              }}
-              onFocus={(e) => {
-                const color = companyData?.primary_color || '#657567';
-                e.target.style.borderColor = color;
-                e.target.style.boxShadow = `0 0 0 2px ${color}33`;
-              }}
-              onBlur={(e) => {
-                e.target.style.boxShadow = 'none';
-                e.target.style.borderColor = 'rgb(209, 213, 219)';
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
+          {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
+            <div>
+              <p className="text-gray-600 mb-4 font-manrope">
+                {t('form.recordLabel')}
+              </p>
+              <AudioRecorder 
+                onRecordingComplete={setAudioBlob}
+                ref={audioRecorderRef}
+                companyColor={companyData?.primary_color || '#657567'}
+              />
+            </div>
+          ) : campaignData?.settings.allowText ? (
+            <div>
+              <textarea
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-32 focus:outline-none"
+                value={textFeedback}
+                onChange={(e) => setTextFeedback(e.target.value)}
+                placeholder={t('form.textareaPlaceholder')}
+                style={{
+                  borderColor: 'rgb(209, 213, 219)' // Default gray-300
+                }}
+                onFocus={(e) => {
+                  const color = companyData?.primary_color || '#657567';
+                  e.target.style.borderColor = color;
+                  e.target.style.boxShadow = `0 0 0 2px ${color}33`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.boxShadow = 'none';
+                  e.target.style.borderColor = 'rgb(209, 213, 219)';
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Consent and Submit */}
       <div className="space-y-4">
@@ -391,7 +448,9 @@ export default function FeedbackForm({
           <span className="text-sm text-gray-600 font-manrope">
             {t('form.consentText', { 
               companyName: companyData?.name || t('form.theCompany'),
-              voiceConsent: feedbackType === 'voice' ? t('form.andVoiceRecording') : ''
+              voiceConsent: (feedbackType === 'voice' || Object.keys(questionVoiceRecordings).length > 0) 
+                ? t('form.andVoiceRecording') 
+                : ''
             })}{' '}
             <a href="/privacy" style={{ color: companyData?.primary_color || '#657567' }} className="hover:underline">{t('form.privacyPolicy')}</a>.
           </span>
