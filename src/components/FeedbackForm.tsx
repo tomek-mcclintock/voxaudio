@@ -257,15 +257,7 @@ export default function FeedbackForm({
     }
   };
 
-  // Function to render HTML content safely
-  const renderHtml = (html: string) => {
-    // Make sure we preserve list formatting
-    const sanitizedHtml = html
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&');
-    return { __html: sanitizedHtml };
-  };
+
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
@@ -275,95 +267,93 @@ export default function FeedbackForm({
           t('form.title')}
       </h1>
 
-      {/* NPS Question */}
-      {campaignData?.include_nps && (
-        <div className="mb-8">
-          <div 
-            className="font-manrope text-gray-700 mb-4"
-            dangerouslySetInnerHTML={renderHtml(campaignData.nps_question || t('form.npsQuestion'))}
-          />
-          <div className="flex justify-between gap-2 mb-2">
-            {[...Array(10)].map((_, i) => {
-              const score = i + 1;
-              return (
-                <button
-                  key={score}
-                  type="button"
-                  onClick={() => setNpsScore(score)}
-                  className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
-                    ${getScoreColor(score)}`}
-                >
-                  {score}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex justify-between mt-2">
-            <span className="text-sm text-gray-500 font-manrope">{t('form.notLikely')}</span>
-            <span className="text-sm text-gray-500 font-manrope">{t('form.veryLikely')}</span>
-          </div>
-        </div>
-      )}
+{/* NPS Question */}
+{campaignData?.include_nps && (
+  <div className="mb-8">
+    <div 
+      className="font-manrope text-gray-700 mb-4 rich-text-content"
+      dangerouslySetInnerHTML={{ __html: campaignData.nps_question || t('form.npsQuestion') }}
+    />
+    <div className="flex justify-between gap-2 mb-2">
+      {[...Array(10)].map((_, i) => {
+        const score = i + 1;
+        return (
+          <button
+            key={score}
+            type="button"
+            onClick={() => setNpsScore(score)}
+            className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
+              ${getScoreColor(score)}`}
+          >
+            {score}
+          </button>
+        );
+      })}
+    </div>
+    <div className="flex justify-between mt-2">
+      <span className="text-sm text-gray-500 font-manrope">{t('form.notLikely')}</span>
+      <span className="text-sm text-gray-500 font-manrope">{t('form.veryLikely')}</span>
+    </div>
+  </div>
+)}
 
       {/* Additional Questions Section */}
       {campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (
-        <div className="space-y-6 mb-8">
-          <h3 className="font-manrope font-semibold text-gray-700">{t('form.additionalQuestions')}</h3>
-          {campaignData.questions.map((question: CampaignQuestion) => (
-            <div key={question.id} className="space-y-2">
-<div className="block font-manrope text-gray-700 rich-text-content">
-  <div dangerouslySetInnerHTML={{ __html: question.formattedText || question.text }} />
-  {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
-</div>
-
-              
-              {question.type === 'text' && (
-                <TextQuestion
-                  question={question}
-                  value={questionResponses[question.id] || ''}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-              
-              {question.type === 'rating' && (
-                <RatingQuestion
-                  question={question}
-                  value={questionResponses[question.id] || null}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-              
-              {question.type === 'multiple_choice' && (
-                <MultipleChoiceQuestion
-                  question={question}
-                  value={questionResponses[question.id] || ''}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-              
-              {question.type === 'yes_no' && (
-                <YesNoQuestion
-                  question={question}
-                  value={questionResponses[question.id] || ''}
-                  onChange={(value) => handleQuestionResponse(question.id, value)}
-                />
-              )}
-
-              {question.type === 'voice_text' && (
-                <VoiceTextQuestion
-                  question={question}
-                  textValue={questionResponses[question.id] || ''}
-                  onTextChange={(value) => handleQuestionResponse(question.id, value)}
-                  onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
-                  companyColor={companyData?.primary_color || '#657567'}
-                  language={language} // Pass the language prop
-                />
-              )}
-
-            </div>
-          ))}
+  <div className="space-y-6 mb-8">
+    <h3 className="font-manrope font-semibold text-gray-700">{t('form.additionalQuestions')}</h3>
+    {campaignData.questions.map((question: CampaignQuestion) => (
+      <div key={question.id} className="space-y-2">
+        <div className="block font-manrope text-gray-700 rich-text-content">
+          <div dangerouslySetInnerHTML={{ __html: question.formattedText || question.text }} />
+          {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
         </div>
-      )}
+        
+        {question.type === 'text' && (
+          <TextQuestion
+            question={question}
+            value={questionResponses[question.id] || ''}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+        
+        {question.type === 'rating' && (
+          <RatingQuestion
+            question={question}
+            value={questionResponses[question.id] || null}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+        
+        {question.type === 'multiple_choice' && (
+          <MultipleChoiceQuestion
+            question={question}
+            value={questionResponses[question.id] || ''}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+        
+        {question.type === 'yes_no' && (
+          <YesNoQuestion
+            question={question}
+            value={questionResponses[question.id] || ''}
+            onChange={(value) => handleQuestionResponse(question.id, value)}
+          />
+        )}
+
+        {question.type === 'voice_text' && (
+          <VoiceTextQuestion
+            question={question}
+            textValue={questionResponses[question.id] || ''}
+            onTextChange={(value) => handleQuestionResponse(question.id, value)}
+            onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
+            companyColor={companyData?.primary_color || '#657567'}
+            language={language}
+          />
+        )}
+      </div>
+    ))}
+  </div>
+)}
 
       {/* Voice/Text Feedback Section - Only shown if NPS is included */}
       {campaignData?.include_nps && (
