@@ -29,7 +29,8 @@ export const translations = {
         voiceResponse: "Voice Response",
         typeAnswerHere: "Type your answer here...",
         clickMicrophoneStart: "Click the microphone to start recording",
-        recordingComplete: "Recording complete. Click play to review or trash to discard."
+        recordingComplete: "Recording complete. Click play to review or trash to discard.",
+        recording: "Recording..."
       }
     },
     de: {
@@ -61,7 +62,8 @@ export const translations = {
         voiceResponse: "Sprachantwort",
         typeAnswerHere: "Geben Sie hier Ihre Antwort ein...",
         clickMicrophoneStart: "Klicken Sie auf das Mikrofon, um die Aufnahme zu starten",
-        recordingComplete: "Aufnahme abgeschlossen. Klicken Sie auf Wiedergabe, um sie zu überprüfen, oder auf Papierkorb, um sie zu verwerfen."
+        recordingComplete: "Aufnahme abgeschlossen. Klicken Sie auf Wiedergabe, um sie zu überprüfen, oder auf Papierkorb, um sie zu verwerfen.",
+        recording: "Aufnahme läuft..."
       }
     }
   };

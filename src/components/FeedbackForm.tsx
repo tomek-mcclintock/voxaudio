@@ -300,7 +300,6 @@ export default function FeedbackForm({
       {/* Additional Questions Section */}
       {campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (
   <div className="space-y-6 mb-8">
-    <h3 className="font-manrope font-semibold text-gray-700">{t('form.additionalQuestions')}</h3>
     {campaignData.questions.map((question: CampaignQuestion) => (
       <div key={question.id} className="space-y-2">
         <div className="block font-manrope text-gray-700 rich-text-content">

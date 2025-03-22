@@ -77,36 +77,36 @@ export default function VoiceTextQuestion({
 
   return (
     <div className="space-y-4">
-      {showTabs && (
-        <div className="flex space-x-2 mb-2">
-          {question.allowText && (
-            <button
-              type="button"
-              onClick={() => setResponseType('text')}
-              className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors 
-                ${responseType === 'text' ? 
-                  'bg-gray-700 text-white' : 
-                  'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              {t('form.textResponse')}
-            </button>
-          )}
-          {question.allowVoice && (
-            <button
-              type="button"
-              onClick={() => setResponseType('voice')}
-              className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors 
-                ${responseType === 'voice' ? 
-                  'bg-gray-700 text-white' : 
-                  'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >
-              <Mic className="w-4 h-4" />
-              {t('form.voiceResponse')}
-            </button>
-          )}
-        </div>
-      )}
+    {showTabs && (
+  <div className="flex justify-center space-x-2 mb-2">
+    {question.allowText && (
+      <button
+        type="button"
+        onClick={() => setResponseType('text')}
+        className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors 
+          ${responseType === 'text' ? 
+            'bg-gray-700 text-white' : 
+            'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+      >
+        <MessageSquare className="w-4 h-4" />
+        {t('form.textResponse')}
+      </button>
+    )}
+    {question.allowVoice && (
+      <button
+        type="button"
+        onClick={() => setResponseType('voice')}
+        className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors 
+          ${responseType === 'voice' ? 
+            'bg-gray-700 text-white' : 
+            'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+      >
+        <Mic className="w-4 h-4" />
+        {t('form.voiceResponse')}
+      </button>
+    )}
+  </div>
+)}
 
       {responseType === 'text' && question.allowText && (
         <textarea

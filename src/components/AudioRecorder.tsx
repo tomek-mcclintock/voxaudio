@@ -241,17 +241,18 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
 
         {/* Status Text */}
         <div className="text-sm text-gray-600 font-manrope">
-          {isRecording ? (
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              Recording...
-            </span>
-          ) : audioBlob ? (
-            t('form.recordingComplete')
-          ) : (
-            t('form.clickMicrophoneStart')
-          )}
-        </div>
+  {isRecording ? (
+    <span className="flex items-center gap-2">
+      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+      {t('form.recording')}
+    </span>
+  ) : audioBlob ? (
+    t('form.recordingComplete')
+  ) : (
+    t('form.clickMicrophoneStart')
+  )}
+</div>
+
       </div>
     );
   }
