@@ -73,15 +73,15 @@ export async function DELETE(
       console.log(`Deleting question responses for ${submissionIds.length} submissions`);
       
       // First attempt to check if there are any question responses
-      const { data: questionResponses, error: checkError } = await serviceRoleClient
+      const { count, error: countError } = await serviceRoleClient
         .from('question_responses')
-        .select('count', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .in('feedback_submission_id', submissionIds);
         
-      if (checkError) {
-        console.error('Error checking question responses:', checkError);
+      if (countError) {
+        console.error('Error checking question responses:', countError);
       } else {
-        console.log(`Found ${questionResponses?.count || 0} question responses to delete`);
+        console.log(`Found ${count || 0} question responses to delete`);
       }
       
       // Delete all question responses
