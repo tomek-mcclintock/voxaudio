@@ -3,6 +3,7 @@
 
 import React from 'react';
 import type { CampaignQuestion } from '@/types/campaign';
+import { translate } from '@/lib/translations';
 
 // Ruggable's brand colors
 const BRAND = {
@@ -11,13 +12,22 @@ const BRAND = {
   ctaHover: '#833f2a',
 } as const;
 
+// Extend the QuestionProps interface to include language
 interface QuestionProps {
-  question: CampaignQuestion;
+  question: CampaignQuestion & { language?: string };
   value: any;
   onChange: (value: any) => void;
 }
 
 export function TextQuestion({ question, value, onChange }: QuestionProps) {
+  // Get language from question props or default to English
+  const language = question.language || 'en';
+  
+  // Helper function for translations
+  const t = (key: string, replacements: Record<string, string> = {}) => {
+    return translate(language, key, replacements);
+  };
+  
   return (
     <textarea
       className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope
@@ -26,7 +36,7 @@ export function TextQuestion({ question, value, onChange }: QuestionProps) {
                 placeholder-gray-400"
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
-      placeholder="Type your answer here..."
+      placeholder={t('form.typeAnswerHere')}
       required={question.required}
     />
   );
@@ -35,6 +45,14 @@ export function TextQuestion({ question, value, onChange }: QuestionProps) {
 export function RatingQuestion({ question, value, onChange }: QuestionProps) {
   const { min = 1, max = 5, minLabel, maxLabel } = question.scale || {};
   const buttons = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  
+  // Get language from question props or default to English
+  const language = question.language || 'en';
+  
+  // Helper function for translations
+  const t = (key: string, replacements: Record<string, string> = {}) => {
+    return translate(language, key, replacements);
+  };
 
   return (
     <div className="space-y-3">
@@ -54,8 +72,8 @@ export function RatingQuestion({ question, value, onChange }: QuestionProps) {
         ))}
       </div>
       <div className="flex justify-between text-sm text-gray-500 font-manrope">
-        <span>{minLabel || 'Poor'}</span>
-        <span>{maxLabel || 'Excellent'}</span>
+        <span>{minLabel || t('form.poor')}</span>
+        <span>{maxLabel || t('form.excellent')}</span>
       </div>
     </div>
   );
@@ -86,25 +104,39 @@ export function MultipleChoiceQuestion({ question, value, onChange }: QuestionPr
 }
 
 export function YesNoQuestion({ question, value, onChange }: QuestionProps) {
+  // Get language from question props or default to English
+  const language = question.language || 'en';
+  
+  // Helper function for translations
+  const t = (key: string, replacements: Record<string, string> = {}) => {
+    return translate(language, key, replacements);
+  };
+  
+  // Use translated yes/no
+  const options = [
+    { value: 'yes', label: t('form.yes') },
+    { value: 'no', label: t('form.no') }
+  ];
+
   return (
     <div className="flex gap-4">
-      {['Yes', 'No'].map((option) => (
-        <label key={option} className="flex-1">
+      {options.map((option) => (
+        <label key={option.value} className="flex-1">
           <div className={`flex items-center justify-center p-4 border rounded-lg cursor-pointer
                           transition-all duration-200 font-manrope font-semibold
-                          ${value === option.toLowerCase() 
+                          ${value === option.value 
                             ? `bg-[${BRAND.primary}] text-white border-[${BRAND.primary}]`
                             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
             <input
               type="radio"
               name={question.id}
-              value={option.toLowerCase()}
-              checked={value === option.toLowerCase()}
+              value={option.value}
+              checked={value === option.value}
               onChange={(e) => onChange(e.target.value)}
               required={question.required}
               className="sr-only" // Hidden but accessible
             />
-            {option}
+            {option.label}
           </div>
         </label>
       ))}

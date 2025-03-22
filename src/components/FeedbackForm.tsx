@@ -308,36 +308,36 @@ export default function FeedbackForm({
         </div>
         
         {question.type === 'text' && (
-          <TextQuestion
-            question={question}
-            value={questionResponses[question.id] || ''}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
-        
-        {question.type === 'rating' && (
-          <RatingQuestion
-            question={question}
-            value={questionResponses[question.id] || null}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
-        
-        {question.type === 'multiple_choice' && (
-          <MultipleChoiceQuestion
-            question={question}
-            value={questionResponses[question.id] || ''}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
-        
-        {question.type === 'yes_no' && (
-          <YesNoQuestion
-            question={question}
-            value={questionResponses[question.id] || ''}
-            onChange={(value) => handleQuestionResponse(question.id, value)}
-          />
-        )}
+  <TextQuestion
+    question={{...question, language}}
+    value={questionResponses[question.id] || ''}
+    onChange={(value) => handleQuestionResponse(question.id, value)}
+  />
+)}
+
+{question.type === 'rating' && (
+  <RatingQuestion
+    question={{...question, language}}
+    value={questionResponses[question.id] || null}
+    onChange={(value) => handleQuestionResponse(question.id, value)}
+  />
+)}
+
+{question.type === 'multiple_choice' && (
+  <MultipleChoiceQuestion
+    question={{...question, language}}
+    value={questionResponses[question.id] || ''}
+    onChange={(value) => handleQuestionResponse(question.id, value)}
+  />
+)}
+
+{question.type === 'yes_no' && (
+  <YesNoQuestion
+    question={{...question, language}}
+    value={questionResponses[question.id] || ''}
+    onChange={(value) => handleQuestionResponse(question.id, value)}
+  />
+)}
 
         {question.type === 'voice_text' && (
           <VoiceTextQuestion
@@ -392,41 +392,40 @@ export default function FeedbackForm({
             </div>
           )}
 
-          {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
-            <div>
-              <p className="text-gray-600 mb-4 font-manrope">
-                {t('form.recordLabel')}
-              </p>
-              <AudioRecorder 
-                onRecordingComplete={setAudioBlob}
-                ref={audioRecorderRef}
-                companyColor={companyData?.primary_color || '#657567'}
-                language={language} // Pass the language prop
-              />
-
-            </div>
-          ) : campaignData?.settings.allowText ? (
-            <div>
-              <textarea
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-32 focus:outline-none"
-                value={textFeedback}
-                onChange={(e) => setTextFeedback(e.target.value)}
-                placeholder={t('form.textareaPlaceholder')}
-                style={{
-                  borderColor: 'rgb(209, 213, 219)' // Default gray-300
-                }}
-                onFocus={(e) => {
-                  const color = companyData?.primary_color || '#657567';
-                  e.target.style.borderColor = color;
-                  e.target.style.boxShadow = `0 0 0 2px ${color}33`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.boxShadow = 'none';
-                  e.target.style.borderColor = 'rgb(209, 213, 219)';
-                }}
-              />
-            </div>
-          ) : null}
+        {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
+          <div>
+            <p className="text-gray-600 mb-4 font-manrope">
+              {t('form.recordLabel')}
+            </p>
+            <AudioRecorder 
+              onRecordingComplete={setAudioBlob}
+              ref={audioRecorderRef}
+              companyColor={companyData?.primary_color || '#657567'}
+              language={language}
+            />
+          </div>
+        ) : campaignData?.settings.allowText ? (
+          <div>
+            <textarea
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-32 focus:outline-none"
+              value={textFeedback}
+              onChange={(e) => setTextFeedback(e.target.value)}
+              placeholder={t('form.textareaPlaceholder')}
+              style={{
+                borderColor: 'rgb(209, 213, 219)' // Default gray-300
+              }}
+              onFocus={(e) => {
+                const color = companyData?.primary_color || '#657567';
+                e.target.style.borderColor = color;
+                e.target.style.boxShadow = `0 0 0 2px ${color}33`;
+              }}
+              onBlur={(e) => {
+                e.target.style.boxShadow = 'none';
+                e.target.style.borderColor = 'rgb(209, 213, 219)';
+              }}
+            />
+          </div>
+        ) : null}
         </div>
       )}
 
