@@ -42,8 +42,6 @@ export async function DELETE(
       );
     }
 
-    console.log('Step 1: Deleting question responses related to this campaign');
-    
     // Find all feedback submissions for this campaign
     const { data: feedbackSubmissions, error: feedbackError } = await supabase
       .from('feedback_submissions')
@@ -52,46 +50,55 @@ export async function DELETE(
     
     if (feedbackError) {
       console.error('Error fetching related submissions:', feedbackError);
+      return NextResponse.json(
+        { error: 'Failed to fetch related feedback submissions' },
+        { status: 500 }
+      );
     }
     
+    // Delete individual feedback submissions and their question responses
     if (feedbackSubmissions && feedbackSubmissions.length > 0) {
       console.log(`Found ${feedbackSubmissions.length} related feedback submissions`);
-      const submissionIds = feedbackSubmissions.map(sub => sub.id);
       
-      // Delete question responses for all related feedback submissions
-      const { error: responsesError } = await supabase
-        .from('question_responses')
-        .delete()
-        .in('feedback_submission_id', submissionIds);
-      
-      if (responsesError) {
-        console.error('Error deleting question responses:', responsesError);
-        return NextResponse.json(
-          { error: 'Failed to delete related question responses' },
-          { status: 500 }
-        );
-      }
-      
-      console.log('Step 2: Deleting feedback submissions');
-      
-      // Delete the feedback submissions themselves
-      const { error: deleteSubmissionsError } = await supabase
-        .from('feedback_submissions')
-        .delete()
-        .eq('campaign_id', campaignId);
-      
-      if (deleteSubmissionsError) {
-        console.error('Error deleting feedback submissions:', deleteSubmissionsError);
-        return NextResponse.json(
-          { error: 'Failed to delete related feedback submissions' },
-          { status: 500 }
-        );
+      // Process each submission individually to ensure the question responses are deleted first
+      for (const submission of feedbackSubmissions) {
+        console.log(`Processing submission: ${submission.id}`);
+        
+        // 1. Delete question responses for this submission
+        console.log(`Deleting question responses for submission: ${submission.id}`);
+        const { error: responsesError } = await supabase
+          .from('question_responses')
+          .delete()
+          .eq('feedback_submission_id', submission.id);
+        
+        if (responsesError) {
+          console.error(`Error deleting question responses for submission ${submission.id}:`, responsesError);
+          return NextResponse.json(
+            { error: `Failed to delete question responses: ${responsesError.message}` },
+            { status: 500 }
+          );
+        }
+        
+        // 2. Delete the feedback submission itself
+        console.log(`Deleting feedback submission: ${submission.id}`);
+        const { error: submissionError } = await supabase
+          .from('feedback_submissions')
+          .delete()
+          .eq('id', submission.id);
+        
+        if (submissionError) {
+          console.error(`Error deleting feedback submission ${submission.id}:`, submissionError);
+          return NextResponse.json(
+            { error: `Failed to delete feedback submission: ${submissionError.message}` },
+            { status: 500 }
+          );
+        }
       }
     } else {
       console.log('No related feedback submissions found');
     }
     
-    console.log('Step 3: Deleting Google Sheets connections');
+    console.log('Deleting Google Sheets connections');
     
     // Delete any Google Sheets connections for this campaign
     const { error: sheetsError } = await supabase
@@ -104,7 +111,7 @@ export async function DELETE(
       // Continue with deletion even if there's an error here
     }
     
-    console.log('Step 4: Deleting the campaign');
+    console.log('Deleting the campaign');
     
     // Finally, delete the campaign
     const { error: deleteError } = await supabase
