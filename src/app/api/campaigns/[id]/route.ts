@@ -1,9 +1,16 @@
 // src/app/api/campaigns/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+
+// Create a service role client that bypasses RLS
+const serviceRoleClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 export async function DELETE(
   request: NextRequest,
@@ -42,8 +49,10 @@ export async function DELETE(
       );
     }
 
+    // From this point on, use the service role client for all deletion operations
+    
     // Find all feedback submissions for this campaign
-    const { data: feedbackSubmissions, error: feedbackError } = await supabase
+    const { data: feedbackSubmissions, error: feedbackError } = await serviceRoleClient
       .from('feedback_submissions')
       .select('id')
       .eq('campaign_id', campaignId);
@@ -56,44 +65,57 @@ export async function DELETE(
       );
     }
     
-    // Delete individual feedback submissions and their question responses
     if (feedbackSubmissions && feedbackSubmissions.length > 0) {
       console.log(`Found ${feedbackSubmissions.length} related feedback submissions`);
       
-      // Process each submission individually to ensure the question responses are deleted first
-      for (const submission of feedbackSubmissions) {
-        console.log(`Processing submission: ${submission.id}`);
+      // Delete all question responses for all submissions at once
+      const submissionIds = feedbackSubmissions.map(sub => sub.id);
+      console.log(`Deleting question responses for ${submissionIds.length} submissions`);
+      
+      // First attempt to check if there are any question responses
+      const { data: questionResponses, error: checkError } = await serviceRoleClient
+        .from('question_responses')
+        .select('count', { count: 'exact', head: true })
+        .in('feedback_submission_id', submissionIds);
         
-        // 1. Delete question responses for this submission
-        console.log(`Deleting question responses for submission: ${submission.id}`);
-        const { error: responsesError } = await supabase
-          .from('question_responses')
-          .delete()
-          .eq('feedback_submission_id', submission.id);
-        
-        if (responsesError) {
-          console.error(`Error deleting question responses for submission ${submission.id}:`, responsesError);
-          return NextResponse.json(
-            { error: `Failed to delete question responses: ${responsesError.message}` },
-            { status: 500 }
-          );
-        }
-        
-        // 2. Delete the feedback submission itself
-        console.log(`Deleting feedback submission: ${submission.id}`);
-        const { error: submissionError } = await supabase
-          .from('feedback_submissions')
-          .delete()
-          .eq('id', submission.id);
-        
-        if (submissionError) {
-          console.error(`Error deleting feedback submission ${submission.id}:`, submissionError);
-          return NextResponse.json(
-            { error: `Failed to delete feedback submission: ${submissionError.message}` },
-            { status: 500 }
-          );
-        }
+      if (checkError) {
+        console.error('Error checking question responses:', checkError);
+      } else {
+        console.log(`Found ${questionResponses?.count || 0} question responses to delete`);
       }
+      
+      // Delete all question responses
+      const { error: responsesError } = await serviceRoleClient
+        .from('question_responses')
+        .delete()
+        .in('feedback_submission_id', submissionIds);
+      
+      if (responsesError) {
+        console.error('Error deleting question responses:', responsesError);
+        return NextResponse.json(
+          { error: `Failed to delete question responses: ${responsesError.message}` },
+          { status: 500 }
+        );
+      }
+      
+      console.log('Successfully deleted all question responses');
+      
+      // Now delete all feedback submissions at once
+      console.log('Deleting all feedback submissions');
+      const { error: submissionsError } = await serviceRoleClient
+        .from('feedback_submissions')
+        .delete()
+        .eq('campaign_id', campaignId);
+      
+      if (submissionsError) {
+        console.error('Error deleting feedback submissions:', submissionsError);
+        return NextResponse.json(
+          { error: `Failed to delete feedback submissions: ${submissionsError.message}` },
+          { status: 500 }
+        );
+      }
+      
+      console.log('Successfully deleted all feedback submissions');
     } else {
       console.log('No related feedback submissions found');
     }
@@ -101,7 +123,7 @@ export async function DELETE(
     console.log('Deleting Google Sheets connections');
     
     // Delete any Google Sheets connections for this campaign
-    const { error: sheetsError } = await supabase
+    const { error: sheetsError } = await serviceRoleClient
       .from('google_sheets_connections')
       .delete()
       .eq('campaign_id', campaignId);
@@ -114,7 +136,7 @@ export async function DELETE(
     console.log('Deleting the campaign');
     
     // Finally, delete the campaign
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await serviceRoleClient
       .from('feedback_campaigns')
       .delete()
       .eq('id', campaignId);
@@ -136,7 +158,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error in delete campaign API:', error);
     return NextResponse.json(
-      { error: 'Failed to process delete request: ' + (error as Error).message },
+      { error: 'Failed to process delete request: ' + (error instanceof Error ? error.message : String(error)) },
       { status: 500 }
     );
   }
