@@ -1,6 +1,7 @@
 // src/app/feedback/page.tsx
 import { Suspense } from 'react';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import FeedbackForm from '@/components/FeedbackForm';
 import Header from '@/components/Header';
@@ -11,7 +12,18 @@ export default async function FeedbackPage({
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  const supabase = createServerComponentClient({ cookies });
+  // Create regular Supabase client for authenticated operations
+  const regularClient = createServerComponentClient({ cookies });
+  
+  // Create service role client to bypass RLS for public access
+  const serviceClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+  
+  // Choose which client to use - for feedback page we use service client to bypass RLS
+  const supabase = serviceClient;
+  
   let companyData = null;
   let campaignData = null;
 
@@ -123,4 +135,4 @@ export default async function FeedbackPage({
       </main>
     </div>
   );
-} 
+}
