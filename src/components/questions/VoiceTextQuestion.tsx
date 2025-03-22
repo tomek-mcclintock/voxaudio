@@ -78,7 +78,7 @@ export default function VoiceTextQuestion({
   return (
     <div className="space-y-4">
     {showTabs && (
-  <div className="flex justify-center space-x-2 mb-2">
+  <div className="flex justify-center space-x-2 mt-6 mb-2">
     {question.allowText && (
       <button
         type="button"
