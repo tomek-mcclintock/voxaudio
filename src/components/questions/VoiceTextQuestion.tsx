@@ -12,7 +12,7 @@ interface VoiceTextQuestionProps {
   onTextChange: (value: string) => void;
   onVoiceRecording: (blob: Blob | null) => void;
   companyColor?: string | null;
-  language?: string; // Add language prop
+  language?: string;
 }
 
 export default function VoiceTextQuestion({
@@ -21,7 +21,7 @@ export default function VoiceTextQuestion({
   onTextChange,
   onVoiceRecording,
   companyColor = '#657567',
-  language = 'en' // Default to English
+  language = 'en'
 }: VoiceTextQuestionProps) {
   const [responseType, setResponseType] = useState<'text' | 'voice'>(
     (question.allowVoice) ? 'voice' : 'text'

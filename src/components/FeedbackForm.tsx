@@ -311,10 +311,11 @@ export default function FeedbackForm({
           <h3 className="font-manrope font-semibold text-gray-700">{t('form.additionalQuestions')}</h3>
           {campaignData.questions.map((question: CampaignQuestion) => (
             <div key={question.id} className="space-y-2">
-              <div className="block font-manrope text-gray-700">
-                <span dangerouslySetInnerHTML={renderHtml(question.formattedText || question.text)} />
-                {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
-              </div>
+            <div className="block font-manrope text-gray-700 formatted-question">
+              <span dangerouslySetInnerHTML={renderHtml(question.formattedText || question.text)} />
+              {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
+            </div>
+
               
               {question.type === 'text' && (
                 <TextQuestion
