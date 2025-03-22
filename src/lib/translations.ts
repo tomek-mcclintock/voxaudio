@@ -23,7 +23,13 @@ export const translations = {
         consentRequired: "Please accept the consent notice to submit feedback",
         npsRequired: "Please provide an NPS score",
         requiredQuestions: "Please answer all required questions",
-        submissionError: "Failed to submit feedback. Please try again."
+        submissionError: "Failed to submit feedback. Please try again.",
+        // Add the missing translations
+        textResponse: "Text Response",
+        voiceResponse: "Voice Response",
+        typeAnswerHere: "Type your answer here...",
+        clickMicrophoneStart: "Click the microphone to start recording",
+        recordingComplete: "Recording complete. Click play to review or trash to discard."
       }
     },
     de: {
@@ -49,7 +55,13 @@ export const translations = {
         consentRequired: "Bitte akzeptieren Sie die Einwilligungserklärung, um Feedback zu senden",
         npsRequired: "Bitte geben Sie eine NPS-Bewertung ab",
         requiredQuestions: "Bitte beantworten Sie alle erforderlichen Fragen",
-        submissionError: "Fehler beim Absenden des Feedbacks. Bitte versuchen Sie es erneut."
+        submissionError: "Fehler beim Absenden des Feedbacks. Bitte versuchen Sie es erneut.",
+        // Add the missing translations in German
+        textResponse: "Textantwort",
+        voiceResponse: "Sprachantwort",
+        typeAnswerHere: "Geben Sie hier Ihre Antwort ein...",
+        clickMicrophoneStart: "Klicken Sie auf das Mikrofon, um die Aufnahme zu starten",
+        recordingComplete: "Aufnahme abgeschlossen. Klicken Sie auf Wiedergabe, um sie zu überprüfen, oder auf Papierkorb, um sie zu verwerfen."
       }
     }
   };

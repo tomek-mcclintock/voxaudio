@@ -4,6 +4,7 @@
 import { useState, useRef } from 'react';
 import { Mic, MessageSquare, Square, Play, Pause, Trash2 } from 'lucide-react';
 import AudioRecorder, { AudioRecorderRef } from '../AudioRecorder';
+import { translate } from '@/lib/translations';
 
 interface VoiceTextQuestionProps {
   question: any;
@@ -11,6 +12,7 @@ interface VoiceTextQuestionProps {
   onTextChange: (value: string) => void;
   onVoiceRecording: (blob: Blob | null) => void;
   companyColor?: string | null;
+  language?: string; // Add language prop
 }
 
 export default function VoiceTextQuestion({
@@ -18,7 +20,8 @@ export default function VoiceTextQuestion({
   textValue,
   onTextChange,
   onVoiceRecording,
-  companyColor = '#657567'
+  companyColor = '#657567',
+  language = 'en' // Default to English
 }: VoiceTextQuestionProps) {
   const [responseType, setResponseType] = useState<'text' | 'voice'>(
     (question.allowVoice) ? 'voice' : 'text'
@@ -28,6 +31,11 @@ export default function VoiceTextQuestion({
   const [isPlaying, setIsPlaying] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
+
+  // Helper function for translations
+  const t = (key: string, replacements: Record<string, string> = {}) => {
+    return translate(language, key, replacements);
+  };
 
   // Handle recording complete
   const handleRecordingComplete = (blob: Blob | null) => {
@@ -81,7 +89,7 @@ export default function VoiceTextQuestion({
                   'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
               <MessageSquare className="w-4 h-4" />
-              Text Response
+              {t('form.textResponse')}
             </button>
           )}
           {question.allowVoice && (
@@ -94,7 +102,7 @@ export default function VoiceTextQuestion({
                   'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
             >
               <Mic className="w-4 h-4" />
-              Voice Response
+              {t('form.voiceResponse')}
             </button>
           )}
         </div>
@@ -105,7 +113,7 @@ export default function VoiceTextQuestion({
           value={textValue}
           onChange={(e) => onTextChange(e.target.value)}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-24 focus:outline-none"
-          placeholder="Type your answer here..."
+          placeholder={t('form.typeAnswerHere')}
         />
       )}
 
@@ -116,6 +124,7 @@ export default function VoiceTextQuestion({
               onRecordingComplete={handleRecordingComplete}
               ref={audioRecorderRef}
               companyColor={companyColor || '#657567'}
+              language={language}
             />
           ) : (
             <div className="flex flex-col items-center gap-4">
@@ -141,7 +150,7 @@ export default function VoiceTextQuestion({
                 </button>
               </div>
               <p className="text-sm text-gray-600">
-                Recording complete. Click play to review or trash to discard.
+                {t('form.recordingComplete')}
               </p>
             </div>
           )}

@@ -3,6 +3,7 @@
 
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Mic, Square, Play, Pause, Trash2 } from 'lucide-react';
+import { translate } from '@/lib/translations';
 
 export interface AudioRecorderRef {
   stopRecording: () => void;
@@ -11,10 +12,11 @@ export interface AudioRecorderRef {
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob | null) => void;
   companyColor?: string; // New prop for company primary color
+  language?: string; // Add language prop
 }
 
 const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
-  ({ onRecordingComplete, companyColor = '#657567' }, ref) => {
+  ({ onRecordingComplete, companyColor = '#657567', language = 'en' }, ref) => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -28,6 +30,11 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
     const analyserRef = useRef<AnalyserNode | null>(null);
     const animationFrameRef = useRef<number>();
     const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Helper function for translations
+    const t = (key: string, replacements: Record<string, string> = {}) => {
+      return translate(language, key, replacements);
+    };
 
     useImperativeHandle(ref, () => ({
       stopRecording: () => {
@@ -240,9 +247,9 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
               Recording...
             </span>
           ) : audioBlob ? (
-            "Recording complete. Click play to review or trash to discard."
+            t('form.recordingComplete')
           ) : (
-            "Click the microphone to start recording"
+            t('form.clickMicrophoneStart')
           )}
         </div>
       </div>

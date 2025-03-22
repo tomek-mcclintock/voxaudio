@@ -355,8 +355,10 @@ export default function FeedbackForm({
                   onTextChange={(value) => handleQuestionResponse(question.id, value)}
                   onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
                   companyColor={companyData?.primary_color || '#657567'}
+                  language={language} // Pass the language prop
                 />
               )}
+
             </div>
           ))}
         </div>
@@ -409,7 +411,9 @@ export default function FeedbackForm({
                 onRecordingComplete={setAudioBlob}
                 ref={audioRecorderRef}
                 companyColor={companyData?.primary_color || '#657567'}
+                language={language} // Pass the language prop
               />
+
             </div>
           ) : campaignData?.settings.allowText ? (
             <div>
