@@ -1,11 +1,18 @@
 // src/app/api/save-feedback/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { uploadVoiceRecording } from '@/lib/s3';
 import { transcribeAudio, analyzeFeedback } from '@/lib/openai';
 import { appendToSheet, formatFeedbackForSheets } from '@/lib/googleSheets';
 
 export const runtime = 'nodejs';
+
+// Create service role client to bypass RLS
+const serviceRoleClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,8 +84,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate campaign exists and belongs to company
-    const { data: campaign, error: campaignError } = await supabase
+    // Validate campaign exists and belongs to company - using service role client
+    const { data: campaign, error: campaignError } = await serviceRoleClient
       .from('feedback_campaigns')
       .select('*')
       .eq('id', campaignId)
@@ -179,11 +186,11 @@ export async function POST(request: NextRequest) {
     const orderIdToSave = orderId && orderId.trim() !== '' ? orderId : null;
     console.log('Order ID to save to database:', orderIdToSave);
 
-    // Save feedback submission
+    // Save feedback submission - using service role client
     console.log('Saving feedback submission...');
     
     // First, check if the campaign has NPS enabled
-    const { data: campaignSettings, error: settingsError } = await supabase
+    const { data: campaignSettings, error: settingsError } = await serviceRoleClient
       .from('feedback_campaigns')
       .select('include_nps')
       .eq('id', campaignId)
@@ -197,7 +204,7 @@ export async function POST(request: NextRequest) {
     // Use null for NPS score if not included in campaign
     const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
     
-    const { data: feedback, error: feedbackError } = await supabase
+    const { data: feedback, error: feedbackError } = await serviceRoleClient
       .from('feedback_submissions')
       .insert({
         company_id: companyId,
@@ -259,8 +266,8 @@ export async function POST(request: NextRequest) {
       console.log('Formatted responses for insertion:', questionResponsesArray);
 
       if (questionResponsesArray.length > 0) {
-        // Attempt to save responses
-        const { data: savedResponses, error: responsesError } = await supabase
+        // Attempt to save responses - using service role client
+        const { data: savedResponses, error: responsesError } = await serviceRoleClient
           .from('question_responses')
           .insert(questionResponsesArray)
           .select();
@@ -279,7 +286,7 @@ export async function POST(request: NextRequest) {
 
     // Check for Google Sheets connection and sync if exists
     console.log('Checking for Google Sheets connection...');
-    const { data: sheetsConnection } = await supabase
+    const { data: sheetsConnection } = await serviceRoleClient
       .from('google_sheets_connections')
       .select('*')
       .eq('campaign_id', campaignId)
