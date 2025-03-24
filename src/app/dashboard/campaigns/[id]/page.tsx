@@ -16,6 +16,7 @@ interface CampaignData {
   active: boolean;
   created_at: string;
   include_nps: boolean;
+  questions?: any[];
   summary?: string | null;
 }
 
@@ -27,6 +28,8 @@ interface FeedbackData {
   question_responses: Array<{
     question_id: string;
     response_value: string;
+    voice_file_url?: string | null;
+    transcription?: string | null;
   }> | null;
 }
 
@@ -48,6 +51,34 @@ interface DailyNpsData {
 interface ChartDataPoint {
   date: string;
   nps: number;
+}
+
+// Helper function to get question text by ID
+function getQuestionTextById(questions: any[] | undefined, questionId: string): string {
+  if (!questions) return `Question ${questionId}`;
+  
+  const question = questions.find(q => q.id === questionId);
+  return question ? question.text : `Question ${questionId}`;
+}
+
+// Helper function to process question response value
+function formatResponseValue(value: string, voiceTranscription?: string | null): string {
+  // If there's a voice transcription, show it
+  if (voiceTranscription) {
+    return `[Voice] ${voiceTranscription}`;
+  }
+  
+  // Try to parse as JSON in case it's a complex value
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed === 'object') {
+      return JSON.stringify(parsed);
+    }
+    return parsed.toString();
+  } catch (e) {
+    // If not JSON, return as is
+    return value;
+  }
 }
 
 export default function CampaignDetails({ params }: { params: { id: string } }) {
@@ -178,20 +209,22 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
     const feedbackData = feedback.map(feedback => {
       // Base feedback data
       const baseData: Record<string, any> = {
-        'Date': new Date(feedback.created_at).toLocaleDateString(),
-        'Voice Feedback': feedback.transcription || '',
-        'Sentiment': feedback.sentiment || ''
+        'Date': new Date(feedback.created_at).toLocaleDateString()
       };
 
       // Add NPS score if campaign includes NPS
       if (campaign.include_nps) {
         baseData['NPS Score'] = feedback.nps_score;
+        baseData['Voice Feedback'] = feedback.transcription || '';
+        baseData['Sentiment'] = feedback.sentiment || '';
       }
 
       // Add question responses
-      if (feedback.question_responses) {
+      if (feedback.question_responses && campaign.questions) {
         feedback.question_responses.forEach(response => {
-          baseData[`Question ${response.question_id}`] = response.response_value;
+          const questionText = getQuestionTextById(campaign.questions, response.question_id);
+          const formattedValue = formatResponseValue(response.response_value, response.transcription);
+          baseData[questionText] = formattedValue;
         });
       }
 
@@ -328,8 +361,8 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         </div>
       )}
 
-      {/* Sentiment Analysis */}
-      {stats && (stats.positiveCount > 0 || stats.negativeCount > 0 || stats.neutralCount > 0) && (
+      {/* Sentiment Analysis - Only show if campaign includes NPS */}
+      {campaign.include_nps && stats && (stats.positiveCount > 0 || stats.negativeCount > 0 || stats.neutralCount > 0) && (
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold mb-4">Sentiment Analysis</h2>
           <div className="flex gap-4">
@@ -360,10 +393,18 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 {campaign.include_nps && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NPS Score</th>
+                  <>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NPS Score</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
+                  </>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
+                {/* Dynamically create columns for custom questions */}
+                {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => (
+                  <th key={question.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    {question.text.length > 30 ? question.text.substring(0, 30) + '...' : question.text}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -372,36 +413,74 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(item.created_at).toLocaleDateString()}
                   </td>
+                  
+                  {/* NPS related columns - only if campaign includes NPS */}
                   {campaign.include_nps && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {item.nps_score !== null ? (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
-                          item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {item.nps_score}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </td>
+                    <>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {item.nps_score !== null ? (
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
+                            item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {item.nps_score}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">N/A</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.sentiment || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {item.transcription ? (
+                          <div className="max-w-xl">
+                            {item.transcription.length > 100 
+                              ? `${item.transcription.substring(0, 100)}...` 
+                              : item.transcription
+                            }
+                          </div>
+                        ) : (
+                          'No voice feedback'
+                        )}
+                      </td>
+                    </>
                   )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.sentiment || 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {item.transcription ? (
-                      <div className="max-w-xl">
-                        {item.transcription.length > 100 
-                          ? `${item.transcription.substring(0, 100)}...` 
-                          : item.transcription
+                  
+                  {/* Question response columns - for all campaigns */}
+                  {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => {
+                    // Find the response for this question
+                    const response = item.question_responses?.find(r => r.question_id === question.id);
+                    
+                    // Determine what to display
+                    let displayValue = 'No response';
+                    
+                    if (response) {
+                      // Check if it's a voice response
+                      if (response.transcription) {
+                        displayValue = `[Voice] ${response.transcription.substring(0, 100)}${response.transcription.length > 100 ? '...' : ''}`;
+                      } else if (response.response_value) {
+                        // Format text response
+                        try {
+                          // Try to parse JSON (for multiple choice, etc.)
+                          const parsed = JSON.parse(response.response_value);
+                          displayValue = typeof parsed === 'object' ? JSON.stringify(parsed) : parsed.toString();
+                        } catch (e) {
+                          // Just use the text as is
+                          displayValue = response.response_value.length > 100 
+                            ? `${response.response_value.substring(0, 100)}...` 
+                            : response.response_value;
                         }
-                      </div>
-                    ) : (
-                      'No voice feedback'
-                    )}
-                  </td>
+                      }
+                    }
+                    
+                    return (
+                      <td key={question.id} className="px-6 py-4 text-sm text-gray-500">
+                        <div className="max-w-xl">{displayValue}</div>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
