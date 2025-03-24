@@ -108,15 +108,17 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
     }
   };
 
-  // Format category data for chart
+  // Format category data for chart - filter out any 0% categories
   const formatCategoryData = () => {
     if (!themeAnalysis?.categories) return [];
     
-    return Object.entries(themeAnalysis.categories).map(([name, data]) => ({
-      name,
-      count: data.count,
-      percentage: data.percentage
-    }));
+    return Object.entries(themeAnalysis.categories)
+      .filter(([_, data]) => data.percentage > 0) // Filter out 0% categories
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        percentage: data.percentage
+      }));
   };
 
   // Format the last analyzed date
@@ -158,7 +160,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
 
       {themeAnalysis && (
         <div className="space-y-8">
-          {/* Category Distribution */}
+          {/* Category Distribution - only shows categories with > 0% */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4">Feedback Categories</h3>
             <div className="h-72">
@@ -193,7 +195,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
             </div>
           </div>
 
-          {/* Theme Frequency */}
+          {/* Theme Frequency - now showing only percentage */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4">Theme Frequency</h3>
             <div className="h-80">
@@ -215,16 +217,15 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
                     height={80} 
                     interval={0}
                   />
-                  <YAxis />
+                  <YAxis 
+                    label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft' }}
+                    domain={[0, 'dataMax + 5']} // Add some padding above the highest value
+                  />
                   <Tooltip 
-                    formatter={(value, name) => {
-                      if (name === 'count') return [value, 'Frequency'];
-                      if (name === 'percentage') return [`${value}%`, 'Percentage'];
-                      return [value, name];
-                    }}
+                    formatter={(value) => [`${value}%`, 'Percentage']}
                   />
                   <Legend />
-                  <Bar dataKey="count" name="Frequency" fill="#3498db" />
+                  {/* Only show the percentage bar */}
                   <Bar dataKey="percentage" name="Percentage" fill="#2ecc71" />
                 </BarChart>
               </ResponsiveContainer>
@@ -250,7 +251,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
                     Theme
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Frequency
+                    Percentage
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Examples
@@ -271,7 +272,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
                       <div className="text-xs text-gray-500 mt-1">{theme.category}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{theme.count} ({theme.percentage.toFixed(1)}%)</div>
+                      <div className="text-sm text-gray-900">{theme.percentage.toFixed(1)}%</div>
                     </td>
                     <td className="px-6 py-4">
                       <ul className="text-sm text-gray-500 list-disc pl-5">
