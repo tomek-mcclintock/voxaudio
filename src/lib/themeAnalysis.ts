@@ -30,6 +30,7 @@ interface ThemeAnalysisResult {
 
 /**
  * Analyzes feedback to extract recurring themes, their frequency, and actionable insights
+ * Uses dynamic category detection based on the actual feedback content
  */
 export async function analyzeFeedbackThemes(
   feedbackItems: { 
@@ -56,13 +57,18 @@ export async function analyzeFeedbackThemes(
     `Feedback ID: ${item.id}\n${item.text}`
   ).join('\n\n');
 
-  // Create a system prompt tailored to theme extraction with language awareness
+  // Create a system prompt for dynamic category detection and theme analysis
   const systemPrompt = `
 You are analyzing customer feedback for ${companyName}'s campaign "${campaignName}".
 
 The feedback is primarily in ${language === 'de' ? 'German' : 'English'}.
 
-Extract the main recurring themes from the feedback and provide the following as a JSON object:
+Your task is to:
+1. First, identify 3-6 main categories that best represent the topics in the feedback
+2. Then extract the specific themes within each category
+3. Calculate accurate frequencies and provide examples
+
+Provide your analysis as a JSON object with this structure:
 {
   "mainThemes": [
     {
@@ -70,16 +76,13 @@ Extract the main recurring themes from the feedback and provide the following as
       "count": number of occurrences,
       "percentage": percentage of feedback mentioning this theme,
       "examples": ["brief quote 1", "brief quote 2"],
-      "category": "product quality | sizing | delivery | customer service | price | other"
+      "category": "Name of the category this theme belongs to"
     }
   ],
   "categories": {
-    "product quality": {"count": number, "percentage": percentage},
-    "sizing": {"count": number, "percentage": percentage},
-    "delivery": {"count": number, "percentage": percentage},
-    "customer service": {"count": number, "percentage": percentage},
-    "price": {"count": number, "percentage": percentage},
-    "other": {"count": number, "percentage": percentage}
+    "Category Name 1": {"count": number, "percentage": percentage},
+    "Category Name 2": {"count": number, "percentage": percentage},
+    etc.
   },
   "totalFeedbackCount": total number of feedback items,
   "actionableInsights": [
@@ -89,13 +92,14 @@ Extract the main recurring themes from the feedback and provide the following as
 }
 
 Important guidelines:
-1. Only include themes that actually appear in the feedback
-2. Calculate accurate percentages based on actual occurrences
-3. Limit to the top 5-8 most significant themes
-4. Categorize each theme into one of the predefined categories
-5. For examples, use short direct quotes from the actual feedback
-6. Provide 3-5 specific actionable insights based on the feedback
-7. Format the response ONLY as a valid JSON object
+1. Dynamically create categories based on the actual feedback content - do NOT use predefined categories
+2. Categories should be descriptive and relevant to the specific feedback (e.g., "Delivery Issues", "Product Quality", "Customer Service")
+3. Only include themes that actually appear in the feedback
+4. Calculate accurate percentages based on actual occurrences
+5. Limit to the top 5-8 most significant themes
+6. For examples, use short direct quotes from the actual feedback
+7. Provide 3-5 specific actionable insights based on the feedback
+8. Format the response ONLY as a valid JSON object
 `;
 
   try {

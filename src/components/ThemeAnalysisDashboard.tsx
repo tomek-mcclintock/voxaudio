@@ -31,16 +31,21 @@ interface ThemeAnalysisDashboardProps {
   campaignId: string;
 }
 
-const CATEGORY_COLORS = {
-  'product quality': '#3498db', // blue
-  'sizing': '#9b59b6',          // purple
-  'delivery': '#e67e22',        // orange
-  'customer service': '#2ecc71', // green
-  'price': '#f1c40f',           // yellow
-  'other': '#95a5a6'            // gray
-};
-
-const DEFAULT_COLORS = ['#3498db', '#9b59b6', '#e67e22', '#2ecc71', '#f1c40f', '#95a5a6', '#e74c3c', '#1abc9c'];
+// Consistent color palette for dynamic assignment
+const COLOR_PALETTE = [
+  '#3498db', // blue
+  '#9b59b6', // purple
+  '#e67e22', // orange
+  '#2ecc71', // green
+  '#f1c40f', // yellow
+  '#e74c3c', // red
+  '#1abc9c', // teal
+  '#34495e', // dark blue
+  '#7f8c8d', // gray
+  '#d35400', // dark orange
+  '#27ae60', // dark green
+  '#8e44ad'  // dark purple
+];
 
 export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDashboardProps) {
   const [themeAnalysis, setThemeAnalysis] = useState<ThemeAnalysisResult | null>(null);
@@ -48,11 +53,26 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(null);
+  const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
 
   // Fetch existing theme analysis when component mounts
   useEffect(() => {
     fetchExistingAnalysis();
   }, [campaignId]);
+
+  // Assign colors to categories when theme analysis changes
+  useEffect(() => {
+    if (themeAnalysis) {
+      const categories = Object.keys(themeAnalysis.categories);
+      const newCategoryColors: Record<string, string> = {};
+      
+      categories.forEach((category, index) => {
+        newCategoryColors[category] = COLOR_PALETTE[index % COLOR_PALETTE.length];
+      });
+      
+      setCategoryColors(newCategoryColors);
+    }
+  }, [themeAnalysis]);
 
   const fetchExistingAnalysis = async () => {
     try {
@@ -179,7 +199,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
                     {formatCategoryData().map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={CATEGORY_COLORS[entry.name as keyof typeof CATEGORY_COLORS] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]} 
+                        fill={categoryColors[entry.name] || COLOR_PALETTE[index % COLOR_PALETTE.length]} 
                       />
                     ))}
                   </Pie>
@@ -195,7 +215,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
             </div>
           </div>
 
-          {/* Theme Frequency - now showing only percentage */}
+          {/* Theme Frequency - percentage only, no legend, y-axis up to 100% */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4">Theme Frequency</h3>
             <div className="h-80">
@@ -219,13 +239,13 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
                   />
                   <YAxis 
                     label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft' }}
-                    domain={[0, 'dataMax + 5']} // Add some padding above the highest value
+                    domain={[0, 100]} // Fixed y-axis from 0 to 100%
+                    ticks={[0, 50, 100]} // Only show grid lines/ticks at 0%, 50%, and 100%
                   />
                   <Tooltip 
                     formatter={(value) => [`${value}%`, 'Percentage']}
                   />
-                  <Legend />
-                  {/* Only show the percentage bar */}
+                  {/* No Legend */}
                   <Bar dataKey="percentage" name="Percentage" fill="#2ecc71" />
                 </BarChart>
               </ResponsiveContainer>
@@ -265,7 +285,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
                       <div className="flex items-center">
                         <div 
                           className="w-3 h-3 rounded-full mr-2"
-                          style={{ backgroundColor: CATEGORY_COLORS[theme.category as keyof typeof CATEGORY_COLORS] || DEFAULT_COLORS[index % DEFAULT_COLORS.length] }}
+                          style={{ backgroundColor: categoryColors[theme.category] || COLOR_PALETTE[index % COLOR_PALETTE.length] }}
                         ></div>
                         <div className="text-sm font-medium text-gray-900">{theme.theme}</div>
                       </div>
