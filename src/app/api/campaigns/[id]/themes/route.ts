@@ -25,6 +25,7 @@ export async function POST(
   try {
     const supabase = createRouteHandlerClient({ cookies });
     const campaignId = params.id;
+    const timestamp = new Date().toISOString();
 
     // Get current user's company
     log('Fetching user data');
@@ -154,24 +155,27 @@ export async function POST(
       categories: Object.keys(themeAnalysis.categories)
     });
 
-    // Save the theme analysis in the campaign (optional)
+    // Save the theme analysis in the campaign
     const { error: updateError } = await supabase
       .from('feedback_campaigns')
       .update({ 
         theme_analysis: themeAnalysis,
-        last_analyzed: new Date().toISOString()
+        last_analyzed: timestamp
       })
       .eq('id', campaignId);
       
     if (updateError) {
       log('Error saving theme analysis', updateError);
       // Continue anyway as we'll return the results directly
+    } else {
+      log('Theme analysis saved successfully to the database');
     }
 
     return NextResponse.json({ 
       themeAnalysis,
       analyzedFeedbackCount: feedbackItems.length,
-      totalFeedbackCount: feedbackEntries.length
+      totalFeedbackCount: feedbackEntries.length,
+      timestamp
     });
 
   } catch (error: any) {

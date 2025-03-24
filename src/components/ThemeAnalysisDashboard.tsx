@@ -1,7 +1,7 @@
 // src/components/ThemeAnalysisDashboard.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface ThemeCount {
@@ -45,7 +45,37 @@ const DEFAULT_COLORS = ['#3498db', '#9b59b6', '#e67e22', '#2ecc71', '#f1c40f', '
 export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDashboardProps) {
   const [themeAnalysis, setThemeAnalysis] = useState<ThemeAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(null);
+
+  // Fetch existing theme analysis when component mounts
+  useEffect(() => {
+    fetchExistingAnalysis();
+  }, [campaignId]);
+
+  const fetchExistingAnalysis = async () => {
+    try {
+      setInitialLoading(true);
+      const response = await fetch(`/api/campaigns/${campaignId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch campaign data');
+      }
+      
+      const data = await response.json();
+      
+      // Check if campaign has existing theme analysis
+      if (data.theme_analysis && Object.keys(data.theme_analysis).length > 0) {
+        setThemeAnalysis(data.theme_analysis);
+        setLastAnalyzed(data.last_analyzed || null);
+      }
+    } catch (error) {
+      console.error('Error fetching existing theme analysis:', error);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   const analyzeThemes = async () => {
     setLoading(true);
@@ -63,6 +93,13 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
       
       const data = await response.json();
       setThemeAnalysis(data.themeAnalysis);
+      
+      // Update last analyzed timestamp
+      if (data.timestamp) {
+        setLastAnalyzed(data.timestamp);
+      } else {
+        setLastAnalyzed(new Date().toISOString());
+      }
     } catch (err) {
       console.error('Error analyzing themes:', err);
       setError(err instanceof Error ? err.message : 'An error occurred while analyzing themes');
@@ -82,10 +119,27 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
     }));
   };
 
+  // Format the last analyzed date
+  const formatLastAnalyzed = () => {
+    if (!lastAnalyzed) return null;
+    
+    try {
+      const date = new Date(lastAnalyzed);
+      return date.toLocaleString();
+    } catch (e) {
+      return lastAnalyzed;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Theme Analysis</h2>
+        <div>
+          <h2 className="text-xl font-semibold">Theme Analysis</h2>
+          {lastAnalyzed && (
+            <p className="text-sm text-gray-500">Last analyzed: {formatLastAnalyzed()}</p>
+          )}
+        </div>
         <button
           onClick={analyzeThemes}
           disabled={loading}
@@ -234,7 +288,7 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
         </div>
       )}
 
-      {!themeAnalysis && !loading && !error && (
+      {!themeAnalysis && !loading && !initialLoading && !error && (
         <div className="bg-white rounded-lg shadow p-8 text-center">
           <p className="text-gray-500">
             Click "Analyze Themes" to discover recurring themes in your feedback.
@@ -242,10 +296,10 @@ export default function ThemeAnalysisDashboard({ campaignId }: ThemeAnalysisDash
         </div>
       )}
 
-      {loading && (
+      {(loading || initialLoading) && !themeAnalysis && (
         <div className="bg-white rounded-lg shadow p-8 text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mb-4"></div>
-          <p className="text-gray-500">Analyzing...</p>
+          <p className="text-gray-500">Loading analysis data...</p>
         </div>
       )}
     </div>

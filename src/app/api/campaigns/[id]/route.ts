@@ -1,4 +1,6 @@
 // src/app/api/campaigns/[id]/route.ts
+
+// Keep the DELETE method the same as before, but add the GET method to fetch campaign data with theme analysis
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
@@ -11,6 +13,53 @@ const serviceRoleClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const campaignId = params.id;
+    const supabase = createRouteHandlerClient({ cookies });
+
+    // Get current user's company
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('company_id')
+      .eq('email', user?.email)
+      .single();
+
+    if (userError) throw userError;
+
+    // Get campaign with theme analysis data
+    const { data: campaign, error: campaignError } = await supabase
+      .from('feedback_campaigns')
+      .select('*, theme_analysis, last_analyzed')
+      .eq('id', campaignId)
+      .eq('company_id', userData.company_id)
+      .single();
+
+    if (campaignError) {
+      console.error('Error fetching campaign:', campaignError);
+      return NextResponse.json(
+        { error: 'Campaign not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(campaign);
+  } catch (error) {
+    console.error('Error fetching campaign:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch campaign' },
+      { status: 500 }
+    );
+  }
+}
+
 
 export async function DELETE(
   request: NextRequest,
