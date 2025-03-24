@@ -30,6 +30,7 @@ export const translations = {
       clickMicrophoneStart: "Click the microphone to start recording",
       recordingComplete: "Recording complete. Click play to review or trash to discard.",
       recording: "Recording...",
+      optional: "(Optional)",
       // New translations for question components
       poor: "Poor",
       excellent: "Excellent",
@@ -70,6 +71,7 @@ export const translations = {
       clickMicrophoneStart: "Klicken Sie auf das Mikrofon, um die Aufnahme zu starten",
       recordingComplete: "Aufnahme abgeschlossen. Klicken Sie auf Wiedergabe, um sie zu überprüfen, oder auf Papierkorb, um sie zu verwerfen.",
       recording: "Aufnahme läuft...",
+      optional: "(Optional)",
       // New translations for question components
       poor: "Schlecht",
       excellent: "Ausgezeichnet",

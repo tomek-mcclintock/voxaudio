@@ -305,6 +305,11 @@ export default function FeedbackForm({
         <div className="block font-manrope text-gray-700 rich-text-content">
           <div dangerouslySetInnerHTML={{ __html: question.formattedText || question.text }} />
           {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
+          {!question.required && (
+            <div className="text-sm text-gray-400 mt-1">
+              {t('form.optional')}
+            </div>
+          )}
         </div>
         
         {question.type === 'text' && (
