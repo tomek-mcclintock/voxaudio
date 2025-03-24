@@ -98,7 +98,8 @@ export async function POST(
         voice_file_url,
         question_responses (
           question_id,
-          response_value
+          response_value,
+          transcription
         )
       `)
       .eq('campaign_id', campaignId)
@@ -155,12 +156,11 @@ export async function POST(
           feedbackText += `\n${entry.transcription}`;
         }
         
-        // Add question responses if available (limit to 3 responses per feedback for brevity)
+        // Add question responses if available
         if (entry.question_responses && entry.question_responses.length > 0) {
-          const limitedResponses = entry.question_responses.slice(0, 3);
           feedbackText += '\nResponses:';
           
-          limitedResponses.forEach((response: any) => {
+          entry.question_responses.forEach((response: any) => {
             // Find the question text for this response
             let questionText = 'Question';
             if (campaign.questions) {
@@ -170,7 +170,13 @@ export async function POST(
               }
             }
             
-            feedbackText += `\n- ${questionText}: ${response.response_value}`;
+            // Get the response value or transcription
+            let responseValue = response.response_value;
+            if (response.transcription) {
+              responseValue = `[Voice] ${response.transcription}`;
+            }
+            
+            feedbackText += `\n- ${questionText}: ${responseValue}`;
           });
         }
         
@@ -186,18 +192,24 @@ export async function POST(
       });
     }
 
-    // Create a context-aware system prompt
+    // Create a context-aware system prompt requesting bullet points
     const systemPrompt = `
 You are analyzing customer feedback for ${companyName}'s campaign "${campaignName}".
 
 ${questionsInfo}
 
-Create a concise paragraph (max 150 words) summarizing:
-1. The main patterns and themes in the feedback
-2. Key issues mentioned by customers
-3. Actionable insights for ${companyName}
+Create a concise summary with 3-6 bullet points highlighting:
+- The main themes or patterns found in customer feedback
+- Key issues mentioned by customers
+- Notable positive feedback
+- Actionable insights for ${companyName}
 
-Be specific and mention approximate frequencies when possible (e.g., "30% of feedback mentioned...")
+Important instructions:
+1. Use bullet points format (•) for each key finding
+2. Be specific about what customers are saying
+3. Do NOT invent or estimate percentages unless you can truly count occurrences
+4. Keep each bullet point brief (1-2 sentences)
+5. Focus only on information explicitly present in the feedback
 `;
 
     // Log what we're sending to OpenAI (truncated for readability)
@@ -222,8 +234,8 @@ Be specific and mention approximate frequencies when possible (e.g., "30% of fee
           content: feedbackTexts
         }
       ],
-      temperature: 0.5, // Lower temperature for more focused output
-      max_tokens: 300, // Limit response size
+      temperature: 0.3, // Lower temperature for more focused output
+      max_tokens: 500, // Allow more tokens for bullet points
     });
     const endTime = Date.now();
 
