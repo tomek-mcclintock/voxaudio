@@ -43,16 +43,16 @@ export const translations = {
   },
   de: {
     form: {
-      title: "Teilen Sie Ihre Erfahrung mit uns",
-      npsQuestion: "Wie wahrscheinlich ist es, dass Sie uns Freunden und Familie empfehlen würden?",
+      title: "Teile deine Erfahrung mit uns",
+      npsQuestion: "Wie wahrscheinlich ist es, dass du uns Freunden und Familie empfehlen würdest?",
       notLikely: "Unwahrscheinlich",
       veryLikely: "Sehr wahrscheinlich",
       additionalQuestions: "Zusätzliche Fragen",
       additionalFeedback: "Zusätzliches Feedback:",
       voiceFeedback: "Sprachfeedback",
       textFeedback: "Textfeedback",
-      recordLabel: "Zeichnen Sie Ihr Feedback auf (max. 5 Minuten):",
-      textareaPlaceholder: "Bitte teilen Sie Ihre Gedanken mit...",
+      recordLabel: "Zeichne dein Feedback auf (max. 5 Minuten):",
+      textareaPlaceholder: "Bitte teile hier deine Gedanken mit...",
       submitButton: "Feedback abschicken",
       submitting: "Wird gesendet...",
       consentText: "Ich stimme zu, dass {companyName} mein Feedback{voiceConsent} sammelt und verarbeitet, einschließlich der Verarbeitung auf US-basierten Servern. Ich verstehe, dass diese Daten zur Verbesserung von Produkten und Dienstleistungen verwendet werden.",
@@ -60,16 +60,16 @@ export const translations = {
       theCompany: "das Unternehmen",
       privacyPolicy: "Datenschutzrichtlinie",
       thankYouTitle: "Vielen Dank!",
-      thankYouText: "Ihr Feedback wurde aufgezeichnet.",
-      consentRequired: "Bitte akzeptieren Sie die Einwilligungserklärung, um Feedback zu senden",
-      npsRequired: "Bitte geben Sie eine NPS-Bewertung ab",
-      requiredQuestions: "Bitte beantworten Sie alle erforderlichen Fragen",
-      submissionError: "Fehler beim Absenden des Feedbacks. Bitte versuchen Sie es erneut.",
+      thankYouText: "Dein Feedback wurde aufgezeichnet.",
+      consentRequired: "Bitte akzeptiere die Einwilligungserklärung, um Feedback zu senden",
+      npsRequired: "Bitte gib eine NPS-Bewertung ab",
+      requiredQuestions: "Bitte beantworte alle erforderlichen Fragen",
+      submissionError: "Fehler beim Absenden des Feedbacks. Bitte versuche es erneut.",
       textResponse: "Textantwort",
       voiceResponse: "Sprachantwort",
-      typeAnswerHere: "Geben Sie hier Ihre Antwort ein...",
-      clickMicrophoneStart: "Klicken Sie auf das Mikrofon, um die Aufnahme zu starten",
-      recordingComplete: "Aufnahme abgeschlossen. Klicken Sie auf Wiedergabe, um sie zu überprüfen, oder auf Papierkorb, um sie zu verwerfen.",
+      typeAnswerHere: "Trage hier bitte deine Antwort ein.",
+      clickMicrophoneStart: "Klicke auf das Mikrofon, um die Aufnahme zu starten",
+      recordingComplete: "Aufnahme abgeschlossen. Klicke auf Wiedergabe, um sie zu überprüfen, oder auf Papierkorb, um sie zu verwerfen.",
       recording: "Aufnahme läuft...",
       optional: "(Optional)",
       // New translations for question components
@@ -84,26 +84,26 @@ export const translations = {
   }
 };
   
-  // Helper function to get translation
-  export function translate(lang: string, key: string, replacements: Record<string, string> = {}): string {
-    // Default to English if language not found
-    const language = translations[lang as keyof typeof translations] || translations.en;
-    
-    // Split the key path (e.g., 'form.title')
-    const keys = key.split('.');
-    let value: any = language;
-    
-    // Navigate through the keys
-    for (const k of keys) {
-      if (!value || typeof value !== 'object') return key;
-      value = value[k];
-    }
-    
-    // If no translation found, return the key
-    if (typeof value !== 'string') return key;
-    
-    // Replace placeholders like {name} with values from replacements
-    return value.replace(/\{(\w+)\}/g, (_, name) => {
-      return replacements[name] !== undefined ? replacements[name] : `{${name}}`;
-    });
+// Helper function to get translation
+export function translate(lang: string, key: string, replacements: Record<string, string> = {}): string {
+  // Default to English if language not found
+  const language = translations[lang as keyof typeof translations] || translations.en;
+  
+  // Split the key path (e.g., 'form.title')
+  const keys = key.split('.');
+  let value: any = language;
+  
+  // Navigate through the keys
+  for (const k of keys) {
+    if (!value || typeof value !== 'object') return key;
+    value = value[k];
   }
+  
+  // If no translation found, return the key
+  if (typeof value !== 'string') return key;
+  
+  // Replace placeholders like {name} with values from replacements
+  return value.replace(/\{(\w+)\}/g, (_, name) => {
+    return replacements[name] !== undefined ? replacements[name] : `{${name}}`;
+  });
+}
