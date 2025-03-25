@@ -267,6 +267,15 @@ export default function FeedbackForm({
           t('form.title')}
       </h1>
 
+      {campaignData?.introText && (
+  <div className="mb-8">
+    <div 
+      className="font-manrope text-gray-700 rich-text-content"
+      dangerouslySetInnerHTML={{ __html: campaignData.introText }}
+    />
+  </div>
+)}
+
 {/* NPS Question */}
 {campaignData?.include_nps && (
   <div className="mb-8">

@@ -12,7 +12,7 @@ export interface CampaignQuestion {
   id: string;
   type: QuestionType;
   text: string;
-  formattedText?: string; // New field for rich text content
+  formattedText?: string; // For rich text content
   required: boolean;
   options?: string[]; // For multiple choice questions
   scale?: Scale; // For rating questions
@@ -37,4 +37,5 @@ export interface Campaign {
   };
   created_at: string;
   language?: string;
+  introText?: string; // New field for introductory text
 }

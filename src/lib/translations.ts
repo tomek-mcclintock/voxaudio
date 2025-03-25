@@ -43,7 +43,7 @@ export const translations = {
   },
   de: {
     form: {
-      title: "Teile deine Erfahrung mit uns",
+      title: "Teile dein feedback mit uns",
       npsQuestion: "Wie wahrscheinlich ist es, dass du uns Freunden und Familie empfehlen würdest?",
       notLikely: "Unwahrscheinlich",
       veryLikely: "Sehr wahrscheinlich",

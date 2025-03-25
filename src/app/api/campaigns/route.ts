@@ -27,27 +27,28 @@ export async function POST(request: NextRequest) {
 
     // Create new campaign
     const { data: campaign, error: createError } = await supabase
-      .from('feedback_campaigns')
-      .insert([
-        {
-          company_id: userData.company_id,
-          name: campaignData.name,
-          start_date: campaignData.start_date || null,
-          end_date: campaignData.end_date || null,
-          include_nps: campaignData.include_nps ?? true,
-          nps_question: campaignData.nps_question || null,
-          include_additional_questions: campaignData.include_additional_questions ?? false,
-          questions: campaignData.include_additional_questions ? campaignData.questions : [],
-          settings: campaignData.settings || {
-            allowVoice: true,
-            allowText: true
-          },
-          language: campaignData.language || 'en', // Add language field
-          active: true
-        }
-      ])
-      .select()
-      .single();
+    .from('feedback_campaigns')
+    .insert([
+      {
+        company_id: userData.company_id,
+        name: campaignData.name,
+        start_date: campaignData.start_date || null,
+        end_date: campaignData.end_date || null,
+        include_nps: campaignData.include_nps ?? true,
+        nps_question: campaignData.nps_question || null,
+        include_additional_questions: campaignData.include_additional_questions ?? false,
+        questions: campaignData.include_additional_questions ? campaignData.questions : [],
+        settings: campaignData.settings || {
+          allowVoice: true,
+          allowText: true
+        },
+        language: campaignData.language || 'en',
+        introText: campaignData.introText || null, // Add this line
+        active: true
+      }
+    ])
+    .select()
+    .single();  
 
     if (createError) {
       console.error('Error creating campaign:', createError);

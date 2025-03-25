@@ -34,6 +34,7 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
     ...initialData?.settings
   });
   const [language, setLanguage] = useState(initialData?.language || 'en');
+  const [introText, setIntroText] = useState(initialData?.introText || '');
   
   // Quill editor modules configuration
   const quillModules = {
@@ -109,7 +110,8 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
         allowText: settings.allowText || !settings.allowVoice,
       },
       include_additional_questions: includeAdditionalQuestions,
-      language
+      language,
+      introText
     };
     
     console.log('Client side - about to submit:', submitData);
@@ -171,6 +173,29 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
           </select>
           <p className="text-xs text-gray-500 mt-1">
             This sets the language for the customer feedback page.
+          </p>
+        </div>
+      </div>
+
+      {/* Introductory Text */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Introductory Text</h3>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Text to display at the top of the feedback form (optional)
+          </label>
+          <div className="mt-1">
+            <ReactQuill
+              value={introText}
+              onChange={setIntroText}
+              modules={quillModules}
+              formats={quillFormats}
+              theme="snow"
+              className="bg-white"
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            This text will appear at the beginning of your feedback form, before any questions.
           </p>
         </div>
       </div>
