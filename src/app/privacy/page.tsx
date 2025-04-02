@@ -1,12 +1,13 @@
 // src/app/privacy/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import EnglishPrivacyPolicy from './english-policy';
 import GermanPrivacyPolicy from './german-policy';
 
-export default function PrivacyPage() {
+// Client component that uses useSearchParams
+function PrivacyContent() {
   const searchParams = useSearchParams();
   const [language, setLanguage] = useState<'en' | 'de' | null>(null);
 
@@ -49,4 +50,19 @@ export default function PrivacyPage() {
 
   // Render the appropriate policy based on language
   return language === 'de' ? <GermanPrivacyPolicy /> : <EnglishPrivacyPolicy />;
+}
+
+// Main page component with Suspense
+export default function PrivacyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg">
+          <p className="text-lg">Loading privacy policy...</p>
+        </div>
+      </div>
+    }>
+      <PrivacyContent />
+    </Suspense>
+  );
 }
