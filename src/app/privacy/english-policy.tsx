@@ -220,7 +220,7 @@ export default function EnglishPrivacyPolicy() {
               <div className="mb-4">
                 <p>Privacy Team</p>
                 <p>VoxAudio Ltd</p>
-                <p>Email: <a href="mailto:privacy@voxaudio.com" className="text-blue-600 hover:underline">privacy@voxaudio.com</a></p>
+                <p>Email: <a href="mailto:voxaudiofeedback@gmail.com" className="text-blue-600 hover:underline">voxaudiofeedback@gmail.com</a></p>
               </div>
               <p className="mb-4">
                 We will respond to your inquiries as soon as possible and within the timeframe specified by applicable law.
