@@ -463,7 +463,13 @@ export default function FeedbackForm({
                 ? t('form.andVoiceRecording') 
                 : ''
             })}{' '}
-            <a href="/privacy" style={{ color: companyData?.primary_color || '#657567' }} className="hover:underline">{t('form.privacyPolicy')}</a>.
+            <a 
+              href={language === 'de' ? "/privacy?lang=de" : "/privacy?lang=en"} 
+              style={{ color: companyData?.primary_color || '#657567' }} 
+              className="hover:underline"
+            >
+              {t('form.privacyPolicy')}
+            </a>.
           </span>
         </label>
 
