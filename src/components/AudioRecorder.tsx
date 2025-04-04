@@ -39,12 +39,12 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       return translate(language, key, replacements);
     };
 
-    // Messages for each progress segment
+    // Messages for each progress segment - using proper translations
     const progressMessages = {
-      initial: "The best feedback is >45s",
-      segment1: "Great start, you're on a roll!",
-      segment2: "Keep going, you're getting close!",
-      segment3: "Perfect length achieved! Feel free to add any final thoughts."
+      initial: t('form.progressInitial'),
+      segment1: t('form.progressSegment1'),
+      segment2: t('form.progressSegment2'),
+      segment3: t('form.progressSegment3')
     };
 
     // Function to get current message based on time
@@ -53,6 +53,14 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       if (time < 30) return progressMessages.segment1;
       if (time < 45) return progressMessages.segment2;
       return progressMessages.segment3;
+    };
+    
+    // Function to get text alignment based on time
+    const getMessageAlignment = (time: number) => {
+      if (time < 15) return "text-left"; // Left aligned
+      if (time < 30) return "text-center"; // Center aligned
+      if (time < 45) return "text-right"; // Right aligned
+      return "text-center"; // Center aligned for final message
     };
 
     // Function to get current color based on time
@@ -76,12 +84,18 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       if (!isRecording) return;
 
       // Set up message transitions at milestone points
-      if (recordingTime === 15 || recordingTime === 30 || recordingTime === 45) {
+      // Using threshold approach for decimal values
+      if ((recordingTime >= 14.9 && recordingTime < 15.1) || 
+          (recordingTime >= 29.9 && recordingTime < 30.1) || 
+          (recordingTime >= 44.9 && recordingTime < 45.1)) {
+        // Identify which threshold we're crossing
+        const milestone = recordingTime < 20 ? 15 : recordingTime < 35 ? 30 : 45;
+        
         // Start fade out
         setIsFading(true);
         
         // Store new message
-        const newMessage = getCurrentMessage(recordingTime);
+        const newMessage = getCurrentMessage(milestone);
         
         // After fade out, update message and fade in
         fadeTimeoutRef.current = setTimeout(() => {
@@ -167,15 +181,17 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
         setFadingMessage(progressMessages.initial);
         drawVisualizer();
         
+        // Use a more frequent interval for smoother updates (100ms)
         timerRef.current = setInterval(() => {
           setRecordingTime(prev => {
             if (prev >= 300) { // 5 minutes limit
               handleStopRecording();
               return prev;
             }
-            return prev + 1;
+            // Increment by 0.1 seconds for smoother progress
+            return prev + 0.1;
           });
-        }, 1000);
+        }, 100);
       } catch (error) {
         console.error('Error accessing microphone:', error);
       }
@@ -229,11 +245,11 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
 
     const formatTime = (seconds: number): string => {
       const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
+      const secs = Math.floor(seconds % 60);
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Calculate progress bar segments
+    // Calculate progress bar segments - with smoother decimal-based progress
     const getSegmentWidth = (segmentIndex: number) => {
       const segmentDuration = 15; // Each segment is 15 seconds
       const startTime = segmentIndex * segmentDuration;
@@ -242,7 +258,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       if (recordingTime <= startTime) return 0;
       if (recordingTime >= endTime) return 100;
       
-      // Calculate percentage filled within this segment
+      // Calculate percentage filled within this segment - with decimal precision
       return ((recordingTime - startTime) / segmentDuration) * 100;
     };
 
@@ -286,7 +302,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
 
         {/* Progress Message */}
         <div 
-          className={`text-sm transition-opacity duration-500 ease-in-out ${isFading ? 'opacity-0' : 'opacity-100'}`}
+          className={`text-sm font-bold w-full transition-opacity duration-500 ease-in-out ${getMessageAlignment(recordingTime)} ${isFading ? 'opacity-0' : 'opacity-100'}`}
           style={{ color: getCurrentColor(recordingTime) }}
         >
           {fadingMessage}

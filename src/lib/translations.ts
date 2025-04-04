@@ -31,14 +31,19 @@ export const translations = {
       recordingComplete: "Recording complete. Click play to review or trash to discard.",
       recording: "Recording...",
       optional: "(Optional)",
-      // New translations for question components
+      // Question components translations
       poor: "Poor",
       excellent: "Excellent",
       yes: "Yes",
       no: "No",
       play: "Play",
       pause: "Pause",
-      discard: "Discard"
+      discard: "Discard",
+      // Progress bar messages
+      progressInitial: "The best feedback is >45s",
+      progressSegment1: "Great start, you're on a roll!",
+      progressSegment2: "Keep going, you're getting close!",
+      progressSegment3: "Perfect length achieved! Feel free to add any final thoughts."
     }
   },
   de: {
@@ -72,14 +77,19 @@ export const translations = {
       recordingComplete: "Aufnahme abgeschlossen. Klicke auf Wiedergabe, um sie zu überprüfen, oder auf Papierkorb, um sie zu verwerfen.",
       recording: "Aufnahme läuft...",
       optional: "(Optional)",
-      // New translations for question components
+      // Question components translations
       poor: "Schlecht",
       excellent: "Ausgezeichnet",
       yes: "Ja",
       no: "Nein",
       play: "Abspielen",
       pause: "Pause",
-      discard: "Verwerfen"
+      discard: "Verwerfen",
+      // Progress bar messages
+      progressInitial: "Das beste Feedback ist >45s",
+      progressSegment1: "Guter Start, weiter so!",
+      progressSegment2: "Mach weiter, du bist fast da!",
+      progressSegment3: "Perfekte Länge erreicht! Füge gerne weitere Gedanken hinzu."
     }
   }
 };
