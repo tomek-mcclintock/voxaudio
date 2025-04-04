@@ -13,6 +13,7 @@ interface VoiceTextQuestionProps {
   onVoiceRecording: (blob: Blob | null) => void;
   companyColor?: string | null;
   language?: string;
+  enableGamification?: boolean; // Add support for gamification toggle
 }
 
 export default function VoiceTextQuestion({
@@ -21,7 +22,8 @@ export default function VoiceTextQuestion({
   onTextChange,
   onVoiceRecording,
   companyColor = '#657567',
-  language = 'en'
+  language = 'en',
+  enableGamification = true // Default to true to maintain backward compatibility
 }: VoiceTextQuestionProps) {
   const [responseType, setResponseType] = useState<'text' | 'voice'>(
     (question.allowVoice) ? 'voice' : 'text'
@@ -125,6 +127,7 @@ export default function VoiceTextQuestion({
               ref={audioRecorderRef}
               companyColor={companyColor || '#657567'}
               language={language}
+              enableGamification={enableGamification} // Pass the gamification toggle
             />
           ) : (
             <div className="flex flex-col items-center gap-4">

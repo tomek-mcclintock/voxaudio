@@ -1,4 +1,4 @@
-// src/components/FeedbackForm.tsx
+// src/components/FeedbackForm.tsx - Updated to include gamification setting
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -84,6 +84,10 @@ export default function FeedbackForm({
   const [consent, setConsent] = useState(false);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
   const [localOrderId] = useState(orderId); // No setState function, making it read-only
+
+  // Check if gamification is enabled in campaign settings
+  const isGamificationEnabled = campaignData?.settings?.enableGamification !== undefined ? 
+    campaignData.settings.enableGamification : true; // Default to true if not specified
 
   const handleQuestionResponse = (questionId: string, value: any) => {
     console.log(`Setting response for question ${questionId}:`, value);
@@ -361,6 +365,7 @@ export default function FeedbackForm({
             onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
             companyColor={companyData?.primary_color || '#657567'}
             language={language}
+            enableGamification={isGamificationEnabled} // Pass gamification setting
           />
         )}
       </div>
@@ -416,6 +421,7 @@ export default function FeedbackForm({
               ref={audioRecorderRef}
               companyColor={companyData?.primary_color || '#657567'}
               language={language}
+              enableGamification={isGamificationEnabled} // Pass the gamification setting
             />
           </div>
         ) : campaignData?.settings.allowText ? (

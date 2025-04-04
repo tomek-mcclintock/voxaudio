@@ -13,10 +13,11 @@ interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob | null) => void;
   companyColor?: string; // Prop for company primary color
   language?: string; // Add language prop
+  enableGamification?: boolean; // New prop to toggle gamification features
 }
 
 const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
-  ({ onRecordingComplete, companyColor = '#657567', language = 'en' }, ref) => {
+  ({ onRecordingComplete, companyColor = '#657567', language = 'en', enableGamification = true }, ref) => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -54,7 +55,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
       if (time < 45) return progressMessages.segment2;
       return progressMessages.segment3;
     };
-    
+
     // Function to get text alignment based on time
     const getMessageAlignment = (time: number) => {
       if (time < 15) return "text-left"; // Left aligned
@@ -81,7 +82,7 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
 
     // Handle message transitions
     useEffect(() => {
-      if (!isRecording) return;
+      if (!isRecording || !enableGamification) return;
 
       // Set up message transitions at milestone points
       // Using threshold approach for decimal values
@@ -103,7 +104,14 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
           setIsFading(false);
         }, 500); // 500ms fade transition
       }
-    }, [recordingTime, isRecording]);
+    }, [recordingTime, isRecording, enableGamification]);
+
+    // Set initial message when recording starts
+    useEffect(() => {
+      if (isRecording && enableGamification) {
+        setFadingMessage(progressMessages.initial);
+      }
+    }, [isRecording, enableGamification]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -178,7 +186,9 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
         mediaRecorder.start();
         setIsRecording(true);
         setRecordingTime(0);
-        setFadingMessage(progressMessages.initial);
+        if (enableGamification) {
+          setFadingMessage(progressMessages.initial);
+        }
         drawVisualizer();
         
         // Use a more frequent interval for smoother updates (100ms)
@@ -281,32 +291,39 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
             className="w-full h-full"
           />
         </div>
-
-        {/* Segmented Progress Bar */}
-        <div className="w-full flex space-x-1">
-          {[0, 1, 2].map((segment) => (
-            <div 
-              key={segment} 
-              className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden"
-            >
-              <div 
-                className="h-full transition-all duration-300 ease-out"
-                style={{ 
-                  width: `${getSegmentWidth(segment)}%`,
-                  backgroundColor: getSegmentColor()
-                }}
-              />
+        
+        {/* Segmented Progress Bar - only shown if gamification is enabled */}
+        {enableGamification && (
+          <div className="w-full space-y-1">
+            {/* Progress bars */}
+            <div className="w-full flex space-x-1">
+              {[0, 1, 2].map((segment) => (
+                <div 
+                  key={segment} 
+                  className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden"
+                >
+                  <div 
+                    className="h-full transition-all duration-300 ease-out"
+                    style={{ 
+                      width: `${getSegmentWidth(segment)}%`,
+                      backgroundColor: getSegmentColor()
+                    }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-
-        {/* Progress Message */}
-        <div 
-          className={`text-sm font-bold w-full transition-opacity duration-500 ease-in-out ${getMessageAlignment(recordingTime)} ${isFading ? 'opacity-0' : 'opacity-100'}`}
-          style={{ color: getCurrentColor(recordingTime) }}
-        >
-          {fadingMessage}
-        </div>
+            
+            {/* Progress Message */}
+            {isRecording && (
+              <div 
+                className={`text-sm font-bold w-full transition-opacity duration-500 ease-in-out ${getMessageAlignment(recordingTime)} ${isFading ? 'opacity-0' : 'opacity-100'}`}
+                style={{ color: getCurrentColor(recordingTime) }}
+              >
+                {fadingMessage}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Controls */}
         <div className="flex items-center gap-4">

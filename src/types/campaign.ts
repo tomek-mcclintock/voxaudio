@@ -1,4 +1,4 @@
-// src/types/campaign.ts
+// src/types/campaign.ts - Updated with gamification setting
 export type QuestionType = 'nps' | 'text' | 'rating' | 'multiple_choice' | 'yes_no' | 'voice_text';
 
 interface Scale {
@@ -34,8 +34,9 @@ export interface Campaign {
   settings: {
     allowVoice: boolean;
     allowText: boolean;
+    enableGamification?: boolean; // New property for toggling gamification features
   };
   created_at: string;
   language?: string;
-  introText?: string; // New field for introductory text
+  introText?: string; // Field for introductory text
 }
