@@ -1,4 +1,4 @@
-// src/components/CampaignForm.tsx
+// src/components/CampaignForm.tsx - with gamification toggle added
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -31,6 +31,7 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
   const [settings, setSettings] = useState({
     allowVoice: true,
     allowText: true,
+    enableGamification: initialData?.settings?.enableGamification ?? true, // New setting for gamification
     ...initialData?.settings
   });
   const [language, setLanguage] = useState(initialData?.language || 'en');
@@ -252,6 +253,23 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
             />
             <span>Allow text feedback</span>
           </label>
+          
+          {/* New Gamification toggle */}
+          {settings.allowVoice && (
+            <div className="pt-2 border-t mt-2">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={settings.enableGamification}
+                  onChange={(e) => setSettings({...settings, enableGamification: e.target.checked})}
+                />
+                <span className="font-medium">Enable voice feedback gamification</span>
+              </label>
+              <p className="text-sm text-gray-500 ml-6 mt-1">
+                Shows colored progress bars and encouraging messages to motivate users to provide longer voice feedback.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
