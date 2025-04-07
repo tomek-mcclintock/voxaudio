@@ -208,7 +208,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
 
   const exportToExcel = () => {
     if (!campaign || !feedback) return;
-
+  
     // Format the current date for the filename
     const dateStr = new Date().toISOString().split('T')[0];
     
@@ -287,7 +287,14 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
     
     // Create workbook and add worksheet
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, campaign.name || 'Feedback');
+    
+    // Excel has a 31 character limit for sheet names
+    // Truncate the campaign name if it's too long
+    const sheetName = campaign.name ? 
+      (campaign.name.length > 31 ? campaign.name.substring(0, 28) + '...' : campaign.name) :
+      'Feedback';
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     
     // Auto-size columns for better readability
     const colWidths = headers.map(h => ({
