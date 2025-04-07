@@ -47,6 +47,7 @@ export async function GET(
       .from('feedback_submissions')
       .select(`
         created_at,
+        order_id,
         nps_score,
         transcription,
         sentiment,
