@@ -24,6 +24,7 @@ interface CampaignData {
 
 interface FeedbackData {
   created_at: string;
+  order_id?: string | null;
   nps_score: number | null;
   transcription: string | null;
   sentiment: string | null;
@@ -208,39 +209,94 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
   const exportToExcel = () => {
     if (!campaign || !feedback) return;
 
-    // Prepare feedback data
-    const feedbackData = feedback.map(feedback => {
-      // Base feedback data
-      const baseData: Record<string, any> = {
-        'Date': new Date(feedback.created_at).toLocaleDateString()
-      };
-
-      // Add NPS score if campaign includes NPS
+    // Format the current date for the filename
+    const dateStr = new Date().toISOString().split('T')[0];
+    
+    // Prepare column headers
+    const headers = ['Date', 'Time', 'Order ID'];
+    
+    // Add NPS score header if campaign includes NPS
+    if (campaign.include_nps) {
+      headers.push('NPS Score');
+      headers.push('Voice Feedback');
+      headers.push('Sentiment');
+    }
+    
+    // Add question headers (getting text from questions array)
+    if (campaign.questions && campaign.questions.length > 0) {
+      campaign.questions.forEach(question => {
+        // Use a shorter version of the question text if it's too long
+        const questionText = question.text.length > 30 
+          ? question.text.substring(0, 30) + '...' 
+          : question.text;
+        headers.push(questionText);
+      });
+    }
+    
+    // Prepare feedback data rows
+    const rows = feedback.map(item => {
+      // Parse the date and time
+      const dateObj = new Date(item.created_at);
+      const date = dateObj.toLocaleDateString();
+      const time = dateObj.toLocaleTimeString();
+      
+      // Start with base data
+      const row = [date, time, item.order_id || ''];
+      
+      // Add NPS data if included
       if (campaign.include_nps) {
-        baseData['NPS Score'] = feedback.nps_score;
-        baseData['Voice Feedback'] = feedback.transcription || '';
-        baseData['Sentiment'] = feedback.sentiment || '';
+        row.push(item.nps_score !== null ? item.nps_score.toString() : 'N/A');
+        row.push(item.transcription || '');
+        row.push(item.sentiment || '');
       }
-
+      
       // Add question responses
-      if (feedback.question_responses && campaign.questions) {
-        feedback.question_responses.forEach(response => {
-          const questionText = getQuestionTextById(campaign.questions, response.question_id);
-          const formattedValue = formatResponseValue(response.response_value, response.transcription);
-          baseData[questionText] = formattedValue;
+      if (campaign.questions && campaign.questions.length > 0) {
+        campaign.questions.forEach(question => {
+          // Find the response for this question
+          const response = item.question_responses?.find(r => r.question_id === question.id);
+          
+          let responseValue = 'No response';
+          
+          if (response) {
+            // Check if it's a voice response with transcription
+            if (response.transcription) {
+              responseValue = `[Voice] ${response.transcription}`;
+            } else if (response.response_value) {
+              // Format text response
+              try {
+                // Try to parse as JSON for multiple choice, etc.
+                const parsed = JSON.parse(response.response_value);
+                responseValue = typeof parsed === 'object' ? JSON.stringify(parsed) : parsed.toString();
+              } catch (e) {
+                // Just use text as is if not JSON
+                responseValue = response.response_value;
+              }
+            }
+          }
+          
+          row.push(responseValue);
         });
       }
-
-      return baseData;
+      
+      return row;
     });
-
-    // Create workbook and add worksheets
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(feedbackData);
-    XLSX.utils.book_append_sheet(wb, ws, campaign.name);
-
-    // Generate Excel file
-    XLSX.writeFile(wb, `${campaign.name}-feedback-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+    // Create worksheet with headers and data
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    
+    // Create workbook and add worksheet
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, campaign.name || 'Feedback');
+    
+    // Auto-size columns for better readability
+    const colWidths = headers.map(h => ({
+      wch: Math.max(h.length, 15) // Set minimum width of 15 characters
+    }));
+    worksheet['!cols'] = colWidths;
+    
+    // Generate Excel file and trigger download
+    XLSX.writeFile(workbook, `${campaign.name}-feedback-export-${dateStr}.xlsx`);
   };
 
   if (loading) {
