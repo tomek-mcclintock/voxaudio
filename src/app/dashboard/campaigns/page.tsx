@@ -147,7 +147,12 @@ export default function CampaignsPage() {
             {campaigns.map((campaign) => (
               <tr key={campaign.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
+                  <Link 
+                    href={`/dashboard/campaigns/${campaign.id}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                  >
+                    {campaign.name}
+                  </Link>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-500">
