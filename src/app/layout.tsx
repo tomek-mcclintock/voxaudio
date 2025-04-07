@@ -1,10 +1,11 @@
 // src/app/layout.tsx
 import './globals.css'
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/react'
 
 export const metadata: Metadata = {
-  title: 'Ruggable Feedback',
-  description: 'Share your experience with Ruggable',
+  title: 'VoxAudio Feedback',
+  description: 'Share your experience',
 }
 
 export default function RootLayout({
@@ -24,7 +25,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-manrope">{children}</body>
+      <body className="font-manrope">
+        {children}
+        <Analytics />
+      </body>
     </html>
   )
 }
