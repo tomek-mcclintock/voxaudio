@@ -293,7 +293,7 @@ export default function FeedbackForm({
 {campaignData?.include_nps && (
   <div className="mb-8">
     <div 
-      className="font-manrope text-gray-700 mb-4 rich-text-content"
+      className="font-manrope font-semibold text-gray-700 mb-4 rich-text-content"
       dangerouslySetInnerHTML={{ __html: campaignData.nps_question || t('form.npsQuestion') }}
     />
     <div className="flex justify-between gap-2 mb-2">
