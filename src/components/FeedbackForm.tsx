@@ -1,4 +1,4 @@
-// src/components/FeedbackForm.tsx - Updated to include gamification setting
+// src/components/FeedbackForm.tsx
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -16,6 +16,8 @@ interface FeedbackFormProps {
   campaignId?: string;
   companyData: CompanyContextType | null;
   campaignData: Campaign | null;
+  npsScore?: number | null;
+  additionalParams?: Record<string, string>;
 }
 
 // Button component types
@@ -59,7 +61,9 @@ export default function FeedbackForm({
   companyId, 
   campaignId,
   companyData,
-  campaignData 
+  campaignData,
+  npsScore: initialNpsScore,
+  additionalParams = {}
 }: FeedbackFormProps) {
   // Get language from campaign or default to English
   const language = campaignData?.language || 'en';
@@ -69,7 +73,7 @@ export default function FeedbackForm({
     return translate(language, key, replacements);
   };
   
-  const [npsScore, setNpsScore] = useState<number | null>(null);
+  const [npsScore, setNpsScore] = useState<number | null>(initialNpsScore || null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [textFeedback, setTextFeedback] = useState('');
   const [feedbackType, setFeedbackType] = useState<'voice' | 'text'>(
@@ -195,6 +199,11 @@ export default function FeedbackForm({
         const responsesJson = JSON.stringify(textResponses);
         console.log('Stringified responses:', responsesJson);
         formData.append('questionResponses', responsesJson);
+      }
+      
+      // Add additional parameters if present
+      if (additionalParams && Object.keys(additionalParams).length > 0) {
+        formData.append('additionalParams', JSON.stringify(additionalParams));
       }
     
       // Log entire FormData
@@ -365,7 +374,7 @@ export default function FeedbackForm({
             onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
             companyColor={companyData?.primary_color || '#657567'}
             language={language}
-            enableGamification={isGamificationEnabled} // Pass gamification setting
+            enableGamification={isGamificationEnabled}
           />
         )}
       </div>
@@ -421,7 +430,7 @@ export default function FeedbackForm({
               ref={audioRecorderRef}
               companyColor={companyData?.primary_color || '#657567'}
               language={language}
-              enableGamification={isGamificationEnabled} // Pass the gamification setting
+              enableGamification={isGamificationEnabled}
             />
           </div>
         ) : campaignData?.settings.allowText ? (
@@ -432,7 +441,7 @@ export default function FeedbackForm({
               onChange={(e) => setTextFeedback(e.target.value)}
               placeholder={t('form.textareaPlaceholder')}
               style={{
-                borderColor: 'rgb(209, 213, 219)' // Default gray-300
+                borderColor: 'rgb(209, 213, 219)'
               }}
               onFocus={(e) => {
                 const color = companyData?.primary_color || '#657567';

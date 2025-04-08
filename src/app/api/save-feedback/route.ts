@@ -39,6 +39,18 @@ export async function POST(request: NextRequest) {
     const voiceQuestionIdsStr = formData.get('voiceQuestionIds') as string | null;
     let voiceQuestionIds: string[] = [];
     
+    // Extract additional parameters
+    const additionalParamsStr = formData.get('additionalParams') as string | null;
+    let metadata = {};
+    if (additionalParamsStr) {
+      try {
+        metadata = JSON.parse(additionalParamsStr);
+        console.log('Additional parameters:', metadata);
+      } catch (e) {
+        console.error('Failed to parse additionalParams:', e);
+      }
+    }
+    
     if (hasVoiceQuestions && voiceQuestionIdsStr) {
       try {
         voiceQuestionIds = JSON.parse(voiceQuestionIdsStr);
@@ -215,6 +227,7 @@ export async function POST(request: NextRequest) {
         transcription,
         sentiment,
         processed: false,
+        metadata: metadata // Store all additional parameters
       })
       .select()
       .single();

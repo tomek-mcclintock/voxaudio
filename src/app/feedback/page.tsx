@@ -54,6 +54,19 @@ export default async function FeedbackPage({
     key => key.toLowerCase() === 'campaign'
   );
   const campaignId = campaignParam ? getParamAsString(campaignParam) : '';
+  
+  // Get NPS score from URL if present
+  const npsScoreParam = getParamAsString('npsScore');
+  const npsScore = npsScoreParam ? parseInt(npsScoreParam, 10) : null;
+  
+  // Collect all other parameters to pass as metadata
+  const additionalParams: Record<string, string> = {};
+  Object.keys(searchParams).forEach(key => {
+    // Skip the ones we've already handled specifically
+    if (!['orderid', 'id', 'cid', 'campaign', 'npsscore'].includes(key.toLowerCase())) {
+      additionalParams[key] = getParamAsString(key);
+    }
+  });
 
   if (companyId) {
     // Get company data
@@ -129,6 +142,8 @@ export default async function FeedbackPage({
               campaignId={campaignId}
               companyData={companyData}
               campaignData={campaignData as Campaign}
+              npsScore={npsScore}
+              additionalParams={additionalParams}
             />
           </Suspense>
         </div>
