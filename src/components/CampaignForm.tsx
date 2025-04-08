@@ -7,6 +7,8 @@ import type { CampaignQuestion, QuestionType } from '@/types/campaign';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
 import '@/styles/quill.css';
+import { translate } from '@/lib/translations';
+
 
 // Dynamically import React Quill with no SSR to avoid hydration issues
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
@@ -37,9 +39,16 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
   const [language, setLanguage] = useState(initialData?.language || 'en');
   const [introText, setIntroText] = useState(initialData?.introText || '');
   const [additionalFeedbackText, setAdditionalFeedbackText] = useState(
-    initialData?.additionalFeedbackText || "What could we do to improve?"
+    initialData?.additionalFeedbackText || translate(language, 'form.additionalFeedbackPlaceholder')
   );
-  
+  useEffect(() => {
+    // Only update if it's still the default text (not user-modified)
+    if (!initialData?.additionalFeedbackText && 
+        (additionalFeedbackText === translate('en', 'form.additionalFeedbackPlaceholder') ||
+         additionalFeedbackText === translate('de', 'form.additionalFeedbackPlaceholder'))) {
+      setAdditionalFeedbackText(translate(language, 'form.additionalFeedbackPlaceholder'));
+    }
+  }, [language]);  
   
   // Quill editor modules configuration
   const quillModules = {
