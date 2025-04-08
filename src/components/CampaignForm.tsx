@@ -36,6 +36,10 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
   });
   const [language, setLanguage] = useState(initialData?.language || 'en');
   const [introText, setIntroText] = useState(initialData?.introText || '');
+  const [additionalFeedbackText, setAdditionalFeedbackText] = useState(
+    initialData?.additionalFeedbackText || "What could we do to improve?"
+  );
+  
   
   // Quill editor modules configuration
   const quillModules = {
@@ -105,6 +109,7 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
       end_date: endDate || null,
       include_nps: includeNps,
       nps_question: npsQuestion,
+      additionalFeedbackText: additionalFeedbackText, // Add the new field here
       questions: includeAdditionalQuestions ? questions : [],
       settings: {
         ...settings,
@@ -116,9 +121,9 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
     };
     
     console.log('Client side - about to submit:', submitData);
-    console.log('NPS Question value:', npsQuestion);
     onSubmit(submitData);
   };
+  
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -217,19 +222,39 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
         </div>
         
         {includeNps && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">NPS Question Text</label>
-            <div className="mt-1">
-              <ReactQuill
-                value={npsQuestion}
-                onChange={setNpsQuestion}
-                modules={quillModules}
-                formats={quillFormats}
-                theme="snow"
-                className="bg-white"
-              />
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">NPS Question Text</label>
+              <div className="mt-1">
+                <ReactQuill
+                  value={npsQuestion}
+                  onChange={setNpsQuestion}
+                  modules={quillModules}
+                  formats={quillFormats}
+                  theme="snow"
+                  className="bg-white"
+                />
+              </div>
             </div>
-          </div>
+            
+            {/* New field for Additional Feedback Text */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Additional Feedback Text</label>
+              <div className="mt-1">
+                <ReactQuill
+                  value={additionalFeedbackText}
+                  onChange={setAdditionalFeedbackText}
+                  modules={quillModules}
+                  formats={quillFormats}
+                  theme="snow"
+                  className="bg-white"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                This text will appear above the voice/text feedback section.
+              </p>
+            </div>
+          </>
         )}
       </div>
 

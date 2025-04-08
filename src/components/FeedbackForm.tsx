@@ -384,8 +384,15 @@ export default function FeedbackForm({
 
       {/* Voice/Text Feedback Section - Only shown if NPS is included */}
       {campaignData?.include_nps && (
-        <div className="space-y-4 mb-8">
-          <p className="font-manrope font-semibold text-gray-700">{t('form.additionalFeedback')}</p>
+  <div className="space-y-4 mb-8">
+    <p className="font-manrope font-semibold text-gray-700">
+      {/* Use the custom text if available, or fall back to translation */}
+      {campaignData.additionalFeedbackText ? (
+        <div dangerouslySetInnerHTML={{ __html: campaignData.additionalFeedbackText }} />
+      ) : (
+        t('form.additionalFeedback')
+      )}
+    </p>
           
           {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
             <div className="flex justify-center space-x-4 mb-6">

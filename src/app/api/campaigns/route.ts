@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
         end_date: campaignData.end_date || null,
         include_nps: campaignData.include_nps ?? true,
         nps_question: campaignData.nps_question || null,
+        additionalFeedbackText: campaignData.additionalFeedbackText || null, // Add the new field here
         include_additional_questions: campaignData.include_additional_questions ?? false,
         questions: campaignData.include_additional_questions ? campaignData.questions : [],
         settings: campaignData.settings || {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
           allowText: true
         },
         language: campaignData.language || 'en',
-        introText: campaignData.introText || null, // Add this line
+        introText: campaignData.introText || null,
         active: true
       }
     ])

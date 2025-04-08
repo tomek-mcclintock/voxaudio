@@ -34,9 +34,10 @@ export interface Campaign {
   settings: {
     allowVoice: boolean;
     allowText: boolean;
-    enableGamification?: boolean; // New property for toggling gamification features
+    enableGamification?: boolean; 
   };
   created_at: string;
   language?: string;
-  introText?: string; // Field for introductory text
+  introText?: string;
+  additionalFeedbackText?: string; // New field for customizable additional feedback text
 }
