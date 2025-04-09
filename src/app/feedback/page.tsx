@@ -15,7 +15,7 @@ async function saveInitialNpsScore(
   orderId: string,
   additionalParams: Record<string, string>
 ) {
-  if (!npsScore || !companyId || !campaignId) return;
+  if (npsScore === null || !companyId || !campaignId) return;
   
   try {
     console.log(`Saving initial NPS score: ${npsScore} for company: ${companyId}, campaign: ${campaignId}`);
@@ -88,7 +88,7 @@ export default async function FeedbackPage({
   
   // Get NPS score from URL if present
   const npsScoreParam = getParamAsString('npsScore');
-  const npsScore = npsScoreParam ? parseInt(npsScoreParam, 10) : null;
+  const npsScore = npsScoreParam !== '' ? parseInt(npsScoreParam, 10) : null;
   
   // Collect all other parameters to pass as metadata
   const additionalParams: Record<string, string> = {};
@@ -157,7 +157,7 @@ export default async function FeedbackPage({
   if (npsScore !== null && companyId && campaignId) {
     await saveInitialNpsScore(serviceClient, companyId, campaignId, npsScore, orderId, additionalParams);
   }
-  
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header companyData={companyData} />
