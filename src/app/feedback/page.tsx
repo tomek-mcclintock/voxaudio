@@ -7,6 +7,37 @@ import FeedbackForm from '@/components/FeedbackForm';
 import Header from '@/components/Header';
 import type { Campaign } from '@/types/campaign';
 
+async function saveInitialNpsScore(
+  serviceClient: any, 
+  companyId: string, 
+  campaignId: string, 
+  npsScore: number, 
+  orderId: string,
+  additionalParams: Record<string, string>
+) {
+  if (!npsScore || !companyId || !campaignId) return;
+  
+  try {
+    console.log(`Saving initial NPS score: ${npsScore} for company: ${companyId}, campaign: ${campaignId}`);
+    
+    // Create a minimal submission with just the NPS score and metadata
+    await serviceClient
+      .from('feedback_submissions')
+      .insert({
+        company_id: companyId,
+        campaign_id: campaignId,
+        order_id: orderId || null,
+        nps_score: npsScore,
+        metadata: additionalParams,
+        processed: false,
+      });
+    
+    console.log('Initial NPS score saved successfully');
+  } catch (error) {
+    console.error('Error saving initial NPS score:', error);
+  }
+}
+
 export default async function FeedbackPage({
   searchParams,
 }: {
@@ -123,6 +154,10 @@ export default async function FeedbackPage({
     );
   }
 
+  if (npsScore !== null && companyId && campaignId) {
+    await saveInitialNpsScore(serviceClient, companyId, campaignId, npsScore, orderId, additionalParams);
+  }
+  
   return (
     <div className="min-h-screen flex flex-col">
       <Header companyData={companyData} />

@@ -93,6 +93,39 @@ export default function FeedbackForm({
   const isGamificationEnabled = campaignData?.settings?.enableGamification !== undefined ? 
     campaignData.settings.enableGamification : true; // Default to true if not specified
 
+    const updateNpsScore = async (newScore: number) => {
+      // First update the local state
+      setNpsScore(newScore);
+      
+      // Then send an update to the server to record this change
+      try {
+        console.log(`Updating NPS score to ${newScore}`);
+        const updateData = new FormData();
+        updateData.append('companyId', companyId);
+        updateData.append('campaignId', campaignId || '');
+        updateData.append('npsScore', newScore.toString());
+        updateData.append('orderId', localOrderId || '');
+        
+        // If we have additional parameters, include them
+        if (Object.keys(additionalParams).length > 0) {
+          updateData.append('additionalParams', JSON.stringify(additionalParams));
+        }
+        
+        // Send to a new API endpoint specifically for updating NPS scores
+        const response = await fetch('/api/update-nps-score', {
+          method: 'POST',
+          body: updateData,
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to update NPS score: Server returned', response.status);
+        }
+      } catch (error) {
+        console.error('Error updating NPS score:', error);
+        // Don't display an error to the user or disrupt the form
+      }
+    };  
+  
   const handleQuestionResponse = (questionId: string, value: any) => {
     console.log(`Setting response for question ${questionId}:`, value);
     setQuestionResponses(prev => {
@@ -289,11 +322,10 @@ export default function FeedbackForm({
   </div>
 )}
 
-{/* NPS Question */}
 {campaignData?.include_nps && (
   <div className="mb-8">
     <div 
-      className="font-manrope font-semibold text-gray-700 mb-4 rich-text-content"
+      className="font-manrope text-gray-700 mb-4 rich-text-content"
       dangerouslySetInnerHTML={{ __html: campaignData.nps_question || t('form.npsQuestion') }}
     />
     <div className="flex justify-between gap-2 mb-2">
@@ -303,7 +335,7 @@ export default function FeedbackForm({
           <button
             key={score}
             type="button"
-            onClick={() => setNpsScore(score)}
+            onClick={() => updateNpsScore(score)}
             className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
               ${getScoreColor(score)}`}
           >
@@ -318,6 +350,7 @@ export default function FeedbackForm({
     </div>
   </div>
 )}
+
 
       {/* Additional Questions Section */}
       {campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (

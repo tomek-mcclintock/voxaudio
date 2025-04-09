@@ -216,32 +216,79 @@ export async function POST(request: NextRequest) {
     // Use null for NPS score if not included in campaign
     const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
     
-    const { data: feedback, error: feedbackError } = await serviceRoleClient
-      .from('feedback_submissions')
-      .insert({
-        company_id: companyId,
-        campaign_id: campaignId,
-        order_id: orderIdToSave,
-        nps_score: finalNpsScore,
-        voice_file_url: voiceFileUrl,
-        transcription,
-        sentiment,
-        processed: false,
-        metadata: metadata // Store all additional parameters
-      })
-      .select()
-      .single();
+    // First check if we have an existing submission with this order ID
+console.log(`Checking for existing submissions for company: ${companyId}, campaign: ${campaignId}`);
+const { data: existingSubmissions, error: queryError } = await serviceRoleClient
+  .from('feedback_submissions')
+  .select('id, nps_score, metadata')
+  .eq('company_id', companyId)
+  .eq('campaign_id', campaignId)
+  .order('created_at', { ascending: false })
+  .limit(1);
 
-    if (feedbackError) {
-      console.error('Database error saving feedback:', feedbackError);
-      console.error('Error details:', feedbackError);
-      return NextResponse.json(
-        { error: 'Failed to save feedback' },
-        { status: 500 }
-      );
-    }
+if (queryError) {
+  console.error('Error querying existing submissions:', queryError);
+  return NextResponse.json(
+    { error: 'Failed to check for existing submissions' },
+    { status: 500 }
+  );
+}
 
-    console.log('Feedback saved successfully:', feedback);
+let feedback;
+let feedbackError;
+
+if (existingSubmissions && existingSubmissions.length > 0) {
+  console.log('Found existing submission, updating it with additional feedback data');
+  // Update the existing submission with voice/text and additional data
+  const { data, error } = await serviceRoleClient
+    .from('feedback_submissions')
+    .update({
+      nps_score: finalNpsScore, // This might override with a new score if provided
+      voice_file_url: voiceFileUrl,
+      transcription,
+      sentiment,
+      processed: false,
+      // Note: We're not updating metadata to preserve original URL parameters
+    })
+    .eq('id', existingSubmissions[0].id)
+    .select()
+    .single();
+    
+  feedback = data;
+  feedbackError = error;
+} else {
+  console.log('No existing submission found, creating new one');
+  // No existing submission, create a new one
+  const { data, error } = await serviceRoleClient
+    .from('feedback_submissions')
+    .insert({
+      company_id: companyId,
+      campaign_id: campaignId,
+      order_id: orderIdToSave,
+      nps_score: finalNpsScore,
+      voice_file_url: voiceFileUrl,
+      transcription,
+      sentiment,
+      processed: false,
+      metadata: metadata
+    })
+    .select()
+    .single();
+    
+  feedback = data;
+  feedbackError = error;
+}
+
+if (feedbackError) {
+  console.error('Database error saving feedback:', feedbackError);
+  console.error('Error details:', feedbackError);
+  return NextResponse.json(
+    { error: 'Failed to save feedback' },
+    { status: 500 }
+  );
+}
+
+console.log('Feedback saved successfully:', feedback);
 
     // Save question responses if any
     if ((questionResponses || Object.keys(questionTranscriptions).length > 0) && feedback) {
