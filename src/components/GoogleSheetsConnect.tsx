@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { setCookie } from 'cookies-next'; // You might need to install cookies-next package
 
 interface GoogleSheetsConnectProps {
   campaignId: string;
@@ -40,35 +39,30 @@ export default function GoogleSheetsConnect({ campaignId, onConnect }: GoogleShe
     setLoading(true);
     setError(null);
     try {
+      // Store campaign ID first
+      document.cookie = `pendingCampaignId=${campaignId}; max-age=${60 * 30}; path=/`; // 30 minutes expiry
+      
       // Start OAuth flow
       const response = await fetch('/api/auth/google/url');
+      const data = await response.json();
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to start OAuth flow');
+      if (data.error) {
+        throw new Error(data.error);
       }
       
-      const { url, error } = await response.json();
-      
-      if (error) {
-        throw new Error(error);
-      }
-      
-      if (!url) {
+      if (!data.url) {
         throw new Error('No OAuth URL received');
       }
       
-      // Store campaign ID in cookie for after OAuth
-      setCookie('pendingCampaignId', campaignId, { maxAge: 60 * 30 }); // 30 minutes expiry
+      // Instead of printing the URL, actually redirect to it
+      window.location.href = data.url;
       
-      // Redirect to Google OAuth
-      window.location.href = url;
     } catch (error) {
       console.error('Failed to start OAuth flow:', error);
       setError(error instanceof Error ? error.message : 'Failed to connect to Google Sheets');
-    } finally {
       setLoading(false);
     }
+    // Note: We don't set loading to false here because we're redirecting the page
   };
 
   const handleDisconnect = async () => {

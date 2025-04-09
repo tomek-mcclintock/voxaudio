@@ -6,10 +6,10 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`;
 
 export async function GET() {
-  // Log the environment variables to help debug
-  console.log('Environment variables check:');
-  console.log('CLIENT_ID:', CLIENT_ID);
-  console.log('REDIRECT_URI:', REDIRECT_URI);
+  // Safer logging that doesn't reveal full values
+  console.log('Checking Google OAuth configuration...');
+  console.log('CLIENT_ID exists:', !!CLIENT_ID);
+  console.log('REDIRECT_URI configured:', !!REDIRECT_URI);
   
   if (!CLIENT_ID) {
     console.error('GOOGLE_CLIENT_ID is undefined');
@@ -24,5 +24,6 @@ export async function GET() {
   url.searchParams.append('access_type', 'offline');
   url.searchParams.append('prompt', 'consent');
 
+  // Return just the URL string for direct redirection
   return NextResponse.json({ url: url.toString() });
 }

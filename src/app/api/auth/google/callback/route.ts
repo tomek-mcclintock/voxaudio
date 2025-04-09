@@ -8,16 +8,15 @@ const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`;
 
 export async function GET(request: NextRequest) {
-  // Add debugging logs
+  // Safer logging
   console.log('Google OAuth callback triggered');
-  console.log('CLIENT_ID:', CLIENT_ID);
-  console.log('REDIRECT_URI:', REDIRECT_URI);
-  console.log('CLIENT_SECRET set:', !!CLIENT_SECRET);
+  console.log('OAuth credentials configured:', !!CLIENT_ID && !!CLIENT_SECRET);
 
   if (!CLIENT_ID || !CLIENT_SECRET) {
     console.error('Google OAuth credentials are missing');
     return NextResponse.redirect('/dashboard?error=Google OAuth configuration is missing');
   }
+
 
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
