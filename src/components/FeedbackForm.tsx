@@ -73,7 +73,7 @@ export default function FeedbackForm({
     return translate(language, key, replacements);
   };
   
-  const [npsScore, setNpsScore] = useState<number | null>(initialNpsScore || null);
+  const [npsScore, setNpsScore] = useState<number | null>(initialNpsScore ?? null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [textFeedback, setTextFeedback] = useState('');
   const [feedbackType, setFeedbackType] = useState<'voice' | 'text'>(
@@ -156,7 +156,7 @@ export default function FeedbackForm({
       return;
     }
   
-    if (campaignData?.include_nps && !npsScore) {
+    if (campaignData?.include_nps && npsScore === null) {
       setError(t('form.npsRequired'));
       return;
     }
