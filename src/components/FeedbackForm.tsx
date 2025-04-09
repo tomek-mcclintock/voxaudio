@@ -329,8 +329,8 @@ export default function FeedbackForm({
       dangerouslySetInnerHTML={{ __html: campaignData.nps_question || t('form.npsQuestion') }}
     />
     <div className="flex justify-between gap-2 mb-2">
-      {[...Array(10)].map((_, i) => {
-        const score = i + 1;
+      {[...Array(11)].map((_, i) => {
+        const score = i;
         return (
           <button
             key={score}
