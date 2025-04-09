@@ -38,31 +38,31 @@ export default function GoogleSheetsConnect({ campaignId, onConnect }: GoogleShe
   const handleConnect = async () => {
     setLoading(true);
     setError(null);
+    
     try {
-      // Store campaign ID first
-      document.cookie = `pendingCampaignId=${campaignId}; max-age=${60 * 30}; path=/`; // 30 minutes expiry
+      // Store campaign ID in the cookie
+      document.cookie = `pendingCampaignId=${campaignId}; max-age=${60 * 30}; path=/`;
       
-      // Start OAuth flow
-      const response = await fetch('/api/auth/google/url');
-      const data = await response.json();
+      // Create the OAuth URL directly in the frontend
+      // This prevents issues with the JSON response not triggering a redirect
+      const clientId = '253510516449-3ffq391n08r19tj1nkv9bfsqthqbp72i.apps.googleusercontent.com';
+      const redirectUri = `${window.location.origin}/api/auth/google/callback`;
       
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      const googleUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      googleUrl.searchParams.append('client_id', clientId);
+      googleUrl.searchParams.append('redirect_uri', redirectUri);
+      googleUrl.searchParams.append('response_type', 'code');
+      googleUrl.searchParams.append('scope', 'https://www.googleapis.com/auth/spreadsheets');
+      googleUrl.searchParams.append('access_type', 'offline');
+      googleUrl.searchParams.append('prompt', 'consent');
       
-      if (!data.url) {
-        throw new Error('No OAuth URL received');
-      }
-      
-      // Instead of printing the URL, actually redirect to it
-      window.location.href = data.url;
-      
+      // Force the browser to navigate to the Google OAuth URL
+      window.location.href = googleUrl.toString();
     } catch (error) {
       console.error('Failed to start OAuth flow:', error);
       setError(error instanceof Error ? error.message : 'Failed to connect to Google Sheets');
       setLoading(false);
     }
-    // Note: We don't set loading to false here because we're redirecting the page
   };
 
   const handleDisconnect = async () => {
