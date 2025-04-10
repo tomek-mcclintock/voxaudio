@@ -213,12 +213,13 @@ export async function POST(request: NextRequest) {
     // Use null for NPS score if not included in campaign
     const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
     
-    // NEW CODE: Check for duplicate submissions based on metadata
+    // IMPROVED CODE: Enhanced check for duplicate submissions based on metadata
     // Only check if metadata is not empty
     let existingSubmission = null;
     
     if (metadata && Object.keys(metadata).length > 0) {
       console.log('Checking for existing submissions with same metadata');
+      console.log('Current submission metadata:', JSON.stringify(metadata));
       
       // We'll look for submissions with the exact same metadata JSON
       const { data: existingSubmissions, error: queryError } = await serviceRoleClient
@@ -226,20 +227,38 @@ export async function POST(request: NextRequest) {
         .select('id, metadata, created_at')
         .eq('company_id', companyId)
         .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);  // Check recent submissions
     
       if (queryError) {
         console.error('Error querying existing submissions:', queryError);
       } else if (existingSubmissions && existingSubmissions.length > 0) {
+        console.log(`Found ${existingSubmissions.length} previous submissions to check`);
+        
         // Check each submission's metadata to find a match
         for (const submission of existingSubmissions) {
-          if (submission.metadata) {
-            // Compare the metadata objects
-            const isEqual = compareMetadata(metadata, submission.metadata);
-            if (isEqual) {
-              console.log(`Found existing submission with matching metadata: ${submission.id}`);
+          if (submission.metadata && Object.keys(submission.metadata).length > 0) {
+            console.log(`Comparing with submission ${submission.id}`);
+            console.log('DB metadata:', JSON.stringify(submission.metadata));
+            
+            // Extract key identifiers from both metadata objects
+            const currentIdentifiers = extractIdentifiers(metadata);
+            const existingIdentifiers = extractIdentifiers(submission.metadata);
+            
+            console.log('Current identifiers:', currentIdentifiers);
+            console.log('Existing identifiers:', existingIdentifiers);
+            
+            // If we have identifiers to compare and they match
+            if (
+              currentIdentifiers && 
+              existingIdentifiers && 
+              currentIdentifiers === existingIdentifiers
+            ) {
+              console.log(`Metadata MATCH found for submission: ${submission.id}`);
               existingSubmission = submission;
               break;
+            } else {
+              console.log('No match with this submission');
             }
           }
         }
@@ -438,29 +457,57 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper function to compare metadata objects
-function compareMetadata(obj1: any, obj2: any): boolean {
-  // If both are null or undefined, they're equal
-  if (!obj1 && !obj2) return true;
+/**
+ * Extracts key identifiers from metadata that uniquely identify a submission
+ * @param metadata The metadata object
+ * @returns A string representation of the key identifiers
+ */
+function extractIdentifiers(metadata: any): string | null {
+  if (!metadata) return null;
   
-  // If only one is null/undefined, they're not equal
-  if (!obj1 || !obj2) return false;
-  
-  // Get all keys from both objects
-  const allKeys = [...new Set([...Object.keys(obj1), ...Object.keys(obj2)])];
-  
-  // Compare each key
-  for (const key of allKeys) {
-    // If key exists in both objects
-    if (key in obj1 && key in obj2) {
-      // If values don't match, objects aren't equal
-      if (obj1[key] !== obj2[key]) return false;
-    } else {
-      // If key exists in only one object, they're not equal
-      return false;
+  // Common identifiers in Klaviyo and email campaign URLs
+  const keyFields = [
+    'email', 'email_id', 'customer_id', 'user_id', 'order_id', 
+    'subscriber_id', 'campaign_id', 'nps_id', '_kx', 'distinct_id'
+  ];
+
+  // Start with the most specific identifiers
+  for (const field of keyFields) {
+    if (metadata[field]) {
+      return `${field}:${metadata[field]}`;
     }
   }
   
-  // If we got here, all keys and values match
-  return true;
+  // If no standard identifiers, try to find any customer/user identifier
+  for (const key in metadata) {
+    if (
+      key.toLowerCase().includes('id') || 
+      key.toLowerCase().includes('email') ||
+      key.toLowerCase().includes('customer')
+    ) {
+      return `${key}:${metadata[key]}`;
+    }
+  }
+  
+  // If we have utm parameters, use those
+  if (metadata.utm_source || metadata.utm_campaign || metadata.utm_medium) {
+    const utm = [
+      metadata.utm_source || '',
+      metadata.utm_campaign || '',
+      metadata.utm_medium || ''
+    ].filter(Boolean).join('_');
+    
+    if (utm) return `utm:${utm}`;
+  }
+  
+  // Last resort: create a hash of all values
+  if (Object.keys(metadata).length > 0) {
+    // Sort keys to ensure consistent ordering
+    const sortedKeys = Object.keys(metadata).sort();
+    return sortedKeys
+      .map(key => `${key}:${metadata[key]}`)
+      .join('|');
+  }
+  
+  return null;
 }
