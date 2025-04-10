@@ -213,9 +213,38 @@ export async function POST(request: NextRequest) {
     // Use null for NPS score if not included in campaign
     const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
     
-    // IMPORTANT CHANGE: Always create a new feedback submission record
-    // Don't try to update existing records
-    console.log('Always creating a new feedback submission record');
+    // NEW CODE: Check for duplicate submissions based on metadata
+    // Only check if metadata is not empty
+    let existingSubmission = null;
+    
+    if (metadata && Object.keys(metadata).length > 0) {
+      console.log('Checking for existing submissions with same metadata');
+      
+      // We'll look for submissions with the exact same metadata JSON
+      const { data: existingSubmissions, error: queryError } = await serviceRoleClient
+        .from('feedback_submissions')
+        .select('id, metadata, created_at')
+        .eq('company_id', companyId)
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: false });
+    
+      if (queryError) {
+        console.error('Error querying existing submissions:', queryError);
+      } else if (existingSubmissions && existingSubmissions.length > 0) {
+        // Check each submission's metadata to find a match
+        for (const submission of existingSubmissions) {
+          if (submission.metadata) {
+            // Compare the metadata objects
+            const isEqual = compareMetadata(metadata, submission.metadata);
+            if (isEqual) {
+              console.log(`Found existing submission with matching metadata: ${submission.id}`);
+              existingSubmission = submission;
+              break;
+            }
+          }
+        }
+      }
+    }
     
     // Prepare the feedback data
     const feedbackData = {
@@ -230,20 +259,51 @@ export async function POST(request: NextRequest) {
       metadata: metadata
     };
     
-    console.log('Feedback data to be inserted:', feedbackData);
-
-    // Create a new feedback submission
-    const { data: feedback, error: feedbackError } = await serviceRoleClient
-      .from('feedback_submissions')
-      .insert(feedbackData)
-      .select()
-      .single();
+    let feedback;
+    let feedbackError;
     
-    // Log the result
+    // Use the existing submission if found, otherwise create a new one
+    if (existingSubmission) {
+      console.log(`Updating existing submission: ${existingSubmission.id}`);
+      
+      // Update the existing submission with new data
+      const { data, error } = await serviceRoleClient
+        .from('feedback_submissions')
+        .update(feedbackData)
+        .eq('id', existingSubmission.id)
+        .select()
+        .single();
+        
+      feedback = data;
+      feedbackError = error;
+      
+      if (error) {
+        console.error('Error updating existing submission:', error);
+      } else {
+        console.log('Successfully updated existing submission:', data);
+      }
+    } else {
+      console.log('Creating new submission');
+      
+      // Create a new feedback submission
+      const { data, error } = await serviceRoleClient
+        .from('feedback_submissions')
+        .insert(feedbackData)
+        .select()
+        .single();
+        
+      feedback = data;
+      feedbackError = error;
+      
+      if (error) {
+        console.error('Error creating new submission:', error);
+      } else {
+        console.log('Successfully created new submission:', data);
+      }
+    }
+
     if (feedbackError) {
-      console.error('Error creating new submission:', feedbackError);
-      console.error('Error details:', feedbackError.details);
-      console.error('Error message:', feedbackError.message);
+      console.error('Database error saving feedback:', feedbackError);
       return NextResponse.json(
         { error: 'Failed to save feedback' },
         { status: 500 }
@@ -255,6 +315,21 @@ export async function POST(request: NextRequest) {
     // Save question responses if any
     if ((questionResponses || Object.keys(questionTranscriptions).length > 0) && feedback) {
       console.log('About to save question responses. Feedback ID:', feedback.id);
+      
+      // If we're updating an existing submission, first delete any existing responses
+      if (existingSubmission) {
+        console.log('Deleting existing question responses for submission:', feedback.id);
+        const { error: deleteError } = await serviceRoleClient
+          .from('question_responses')
+          .delete()
+          .eq('feedback_submission_id', feedback.id);
+          
+        if (deleteError) {
+          console.error('Error deleting existing question responses:', deleteError);
+        } else {
+          console.log('Successfully deleted existing question responses');
+        }
+      }
       
       // Format text responses for insertion
       const questionResponsesArray = [];
@@ -296,8 +371,6 @@ export async function POST(request: NextRequest) {
 
         if (responsesError) {
           console.error('Failed to save question responses:', responsesError);
-          console.error('Error details:', responsesError.details);
-          console.error('Error message:', responsesError.message);
         } else {
           console.log('Successfully saved responses:', savedResponses);
         }
@@ -363,4 +436,31 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Helper function to compare metadata objects
+function compareMetadata(obj1: any, obj2: any): boolean {
+  // If both are null or undefined, they're equal
+  if (!obj1 && !obj2) return true;
+  
+  // If only one is null/undefined, they're not equal
+  if (!obj1 || !obj2) return false;
+  
+  // Get all keys from both objects
+  const allKeys = [...new Set([...Object.keys(obj1), ...Object.keys(obj2)])];
+  
+  // Compare each key
+  for (const key of allKeys) {
+    // If key exists in both objects
+    if (key in obj1 && key in obj2) {
+      // If values don't match, objects aren't equal
+      if (obj1[key] !== obj2[key]) return false;
+    } else {
+      // If key exists in only one object, they're not equal
+      return false;
+    }
+  }
+  
+  // If we got here, all keys and values match
+  return true;
 }
