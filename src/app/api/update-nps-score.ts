@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     
     // Log all FormData entries for debugging
-    console.log('Raw FormData entries:');
+    console.log('NPS Update - Raw FormData entries:');
     for (const pair of formData.entries()) {
       console.log(pair[0], ':', pair[1]);
     }
@@ -40,45 +40,74 @@ export async function POST(request: NextRequest) {
     if (additionalParamsStr) {
       try {
         metadata = JSON.parse(additionalParamsStr);
+        console.log('NPS Update - Additional parameters:', metadata);
       } catch (e) {
         console.error('Failed to parse additionalParams:', e);
       }
     }
     
-    console.log(`Checking for existing submission for company: ${companyId}, campaign: ${campaignId}, order: ${orderId}`);
+    // IMPROVED DUPLICATE DETECTION: Check for existing submissions with the same metadata
+    let existingSubmission = null;
     
-    // Check if we already have a submission for this order
-    const { data: existingSubmissions, error: queryError } = await serviceRoleClient
-      .from('feedback_submissions')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('campaign_id', campaignId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    if (queryError) {
-      console.error('Error querying existing submissions:', queryError);
-      throw queryError;
+    if (metadata && Object.keys(metadata).length > 0) {
+      console.log('NPS Update - Checking for existing submissions with same metadata');
+      console.log('Current submission metadata:', JSON.stringify(metadata));
+      
+      const { data: existingSubmissions, error: queryError } = await serviceRoleClient
+        .from('feedback_submissions')
+        .select('id, metadata, created_at')
+        .eq('company_id', companyId)
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (queryError) {
+        console.error('Error querying existing submissions:', queryError);
+      } else if (existingSubmissions && existingSubmissions.length > 0) {
+        console.log(`Found ${existingSubmissions.length} previous submissions to check`);
+        
+        // Check each submission's metadata for an exact match
+        for (const submission of existingSubmissions) {
+          if (submission.metadata && Object.keys(submission.metadata).length > 0) {
+            console.log(`Comparing with submission ${submission.id}`);
+            
+            const metadataSignature = createMetadataSignature(metadata);
+            const existingSignature = createMetadataSignature(submission.metadata);
+            
+            console.log('Current signature:', metadataSignature);
+            console.log('Existing signature:', existingSignature);
+            
+            if (metadataSignature === existingSignature) {
+              console.log(`Metadata MATCH found for submission: ${submission.id}`);
+              existingSubmission = submission;
+              break;
+            }
+          }
+        }
+      }
     }
     
-    if (existingSubmissions && existingSubmissions.length > 0) {
+    if (existingSubmission) {
       // Update the existing submission
-      console.log(`Updating existing submission: ${existingSubmissions[0].id}`);
+      console.log(`Updating existing submission: ${existingSubmission.id}`);
       const { error: updateError } = await serviceRoleClient
         .from('feedback_submissions')
         .update({ 
-          nps_score: npsScore
+          nps_score: npsScore,
+          metadata: metadata  // Update metadata in case structure changed
         })
-        .eq('id', existingSubmissions[0].id);
+        .eq('id', existingSubmission.id);
         
       if (updateError) {
         console.error('Error updating NPS score:', updateError);
         throw updateError;
       }
+      
+      console.log('NPS score successfully updated for existing submission');
     } else {
       // Create a new submission
-      console.log('Creating new submission with NPS score only');
-      const { error: insertError } = await serviceRoleClient
+      console.log('Creating new submission with NPS score');
+      const { data: newSubmission, error: insertError } = await serviceRoleClient
         .from('feedback_submissions')
         .insert({
           company_id: companyId,
@@ -87,15 +116,18 @@ export async function POST(request: NextRequest) {
           nps_score: npsScore,
           metadata: metadata,
           processed: false,
-        });
+        })
+        .select()
+        .single();
         
       if (insertError) {
         console.error('Error creating NPS score submission:', insertError);
         throw insertError;
       }
+      
+      console.log('New submission created with ID:', newSubmission?.id);
     }
     
-    console.log('NPS score successfully updated');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating NPS score:', error);
@@ -104,4 +136,24 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Creates a comprehensive hash/signature from the entire metadata object
+ * @param metadata The metadata object to hash
+ * @returns A string representing the unique signature of the metadata
+ */
+function createMetadataSignature(metadata: any): string | null {
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return null;
+  }
+  
+  // Sort keys for consistent ordering
+  const sortedKeys = Object.keys(metadata).sort();
+  
+  // Create a string of all key-value pairs
+  return sortedKeys
+    .filter(key => metadata[key] !== null && metadata[key] !== undefined && metadata[key] !== '')
+    .map(key => `${key}:${metadata[key]}`)
+    .join('|');
 }
