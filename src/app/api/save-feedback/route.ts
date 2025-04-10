@@ -198,10 +198,7 @@ export async function POST(request: NextRequest) {
     const orderIdToSave = orderId && orderId.trim() !== '' ? orderId : null;
     console.log('Order ID to save to database:', orderIdToSave);
 
-    // Save feedback submission - using service role client
-    console.log('Saving feedback submission...');
-    
-    // First, check if the campaign has NPS enabled
+    // Check if the campaign has NPS enabled
     const { data: campaignSettings, error: settingsError } = await serviceRoleClient
       .from('feedback_campaigns')
       .select('include_nps')
@@ -217,51 +214,28 @@ export async function POST(request: NextRequest) {
     const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
     
     // First check if we have an existing submission with this order ID
-console.log(`Checking for existing submissions for company: ${companyId}, campaign: ${campaignId}`);
-const { data: existingSubmissions, error: queryError } = await serviceRoleClient
-  .from('feedback_submissions')
-  .select('id, nps_score, metadata')
-  .eq('company_id', companyId)
-  .eq('campaign_id', campaignId)
-  .order('created_at', { ascending: false })
-  .limit(1);
+    console.log(`Checking for existing submissions for company: ${companyId}, campaign: ${campaignId}`);
+    const { data: existingSubmissions, error: queryError } = await serviceRoleClient
+      .from('feedback_submissions')
+      .select('id, nps_score, metadata')
+      .eq('company_id', companyId)
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-if (queryError) {
-  console.error('Error querying existing submissions:', queryError);
-  return NextResponse.json(
-    { error: 'Failed to check for existing submissions' },
-    { status: 500 }
-  );
-}
+    if (queryError) {
+      console.error('Error querying existing submissions:', queryError);
+      return NextResponse.json(
+        { error: 'Failed to check for existing submissions' },
+        { status: 500 }
+      );
+    }
 
-let feedback;
-let feedbackError;
+    let feedback;
+    let feedbackError;
 
-if (existingSubmissions && existingSubmissions.length > 0) {
-  console.log('Found existing submission, updating it with additional feedback data');
-  // Update the existing submission with voice/text and additional data
-  const { data, error } = await serviceRoleClient
-    .from('feedback_submissions')
-    .update({
-      nps_score: finalNpsScore, // This might override with a new score if provided
-      voice_file_url: voiceFileUrl,
-      transcription,
-      sentiment,
-      processed: false,
-      // Note: We're not updating metadata to preserve original URL parameters
-    })
-    .eq('id', existingSubmissions[0].id)
-    .select()
-    .single();
-    
-  feedback = data;
-  feedbackError = error;
-} else {
-  console.log('No existing submission found, creating new one');
-  // No existing submission, create a new one
-  const { data, error } = await serviceRoleClient
-    .from('feedback_submissions')
-    .insert({
+    // Prepare the feedback data - simplified for campaigns without NPS
+    const feedbackData = {
       company_id: companyId,
       campaign_id: campaignId,
       order_id: orderIdToSave,
@@ -271,26 +245,65 @@ if (existingSubmissions && existingSubmissions.length > 0) {
       sentiment,
       processed: false,
       metadata: metadata
-    })
-    .select()
-    .single();
+    };
     
-  feedback = data;
-  feedbackError = error;
-}
+    console.log('Feedback data to be inserted/updated:', feedbackData);
 
-if (feedbackError) {
-  console.error('Database error saving feedback:', feedbackError);
-  console.error('Error details:', feedbackError);
-  return NextResponse.json(
-    { error: 'Failed to save feedback' },
-    { status: 500 }
-  );
-}
+    if (existingSubmissions && existingSubmissions.length > 0) {
+      console.log('Found existing submission, updating it with additional feedback data');
+      // Update the existing submission with voice/text and additional data
+      const { data, error } = await serviceRoleClient
+        .from('feedback_submissions')
+        .update(feedbackData)
+        .eq('id', existingSubmissions[0].id)
+        .select()
+        .single();
+        
+      feedback = data;
+      feedbackError = error;
+      
+      // Log the result
+      if (error) {
+        console.error('Error updating existing submission:', error);
+        console.error('Error details:', error.details);
+        console.error('Error message:', error.message);
+      } else {
+        console.log('Successfully updated existing submission:', data);
+      }
+    } else {
+      console.log('No existing submission found, creating new one');
+      // No existing submission, create a new one
+      const { data, error } = await serviceRoleClient
+        .from('feedback_submissions')
+        .insert(feedbackData)
+        .select()
+        .single();
+        
+      feedback = data;
+      feedbackError = error;
+      
+      // Log the result
+      if (error) {
+        console.error('Error creating new submission:', error);
+        console.error('Error details:', error.details);
+        console.error('Error message:', error.message);
+      } else {
+        console.log('Successfully created new submission:', data);
+      }
+    }
 
-console.log('Feedback saved successfully:', feedback);
+    if (feedbackError) {
+      console.error('Database error saving feedback:', feedbackError);
+      console.error('Error details:', feedbackError);
+      return NextResponse.json(
+        { error: 'Failed to save feedback' },
+        { status: 500 }
+      );
+    }
 
-    // Save question responses if any
+    console.log('Feedback saved successfully:', feedback);
+
+    // Save question responses if any - only if feedback was created or updated successfully
     if ((questionResponses || Object.keys(questionTranscriptions).length > 0) && feedback) {
       console.log('About to save question responses. Feedback ID:', feedback.id);
       
@@ -340,8 +353,17 @@ console.log('Feedback saved successfully:', feedback);
           console.log('Successfully saved responses:', savedResponses);
         }
       }
-    } else {
-      console.log('No question responses to save or no feedback ID available');
+    } else if (feedback && !questionResponses && Object.keys(questionTranscriptions).length === 0) {
+      // If feedback was saved successfully but there are no question responses, 
+      // still consider this a success
+      console.log('No question responses to save, but feedback was saved successfully');
+    } else if (!feedback) {
+      // This case should not be reached due to error handling above, but just in case
+      console.error('Unable to save question responses because feedback creation failed');
+      return NextResponse.json(
+        { error: 'Failed to save feedback' },
+        { status: 500 }
+      );
     }
 
     // Check for Google Sheets connection and sync if exists
