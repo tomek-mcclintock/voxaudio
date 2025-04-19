@@ -113,35 +113,34 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
   const [summary, setSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'themes'
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [hasPendingTranscriptions, setHasPendingTranscriptions] = useState(false);
 
-  useEffect(() => {
-    fetchCampaignData();
-    
-    // Set up refresh interval for pending transcriptions
-    const interval = setInterval(() => {
-      const hasPendingTranscriptions = feedback.some(item => 
-        item.question_responses?.some(r => 
-          r.transcription_status === 'pending' || r.transcription_status === 'processing'
-        )
-      );
-      
-      if (hasPendingTranscriptions) {
-        console.log('Refreshing data due to pending transcriptions');
-        fetchCampaignData();
-      } else if (refreshInterval) {
-        // Clear interval if no pending transcriptions
-        clearInterval(refreshInterval);
-        setRefreshInterval(null);
-      }
-    }, 10000); // Check every 10 seconds
-    
-    setRefreshInterval(interval);
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [params.id, feedback]);
+useEffect(() => {
+  // Check if there are pending transcriptions
+  const pendingExists = feedback.some(item => 
+    item.question_responses?.some(r => 
+      r.transcription_status === 'pending' || r.transcription_status === 'processing'
+    )
+  );
+  setHasPendingTranscriptions(pendingExists);
+}, [feedback]);
+
+// Then use this state in your main effect:
+useEffect(() => {
+  fetchCampaignData();
+  
+  // Set up refresh interval only if needed
+  let interval: NodeJS.Timeout | null = null;
+  if (hasPendingTranscriptions) {
+    interval = setInterval(() => {
+      fetchCampaignData();
+    }, 10000);
+  }
+  
+  return () => {
+    if (interval) clearInterval(interval);
+  };
+}, [params.id, hasPendingTranscriptions]); // Remove feedback from dependencies
 
   const fetchCampaignData = async () => {
     try {
