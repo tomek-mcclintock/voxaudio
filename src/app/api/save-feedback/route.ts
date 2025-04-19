@@ -156,9 +156,139 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Process voice recordings for individual questions
+    // Convert empty string OrderID to null to ensure it's properly handled by the database
+    const orderIdToSave = orderId && orderId.trim() !== '' ? orderId : null;
+    console.log('Order ID to save to database:', orderIdToSave);
+
+    // Check if the campaign has NPS enabled
+    const { data: campaignSettings, error: settingsError } = await serviceRoleClient
+      .from('feedback_campaigns')
+      .select('include_nps')
+      .eq('id', campaignId)
+      .single();
+      
+    if (settingsError) {
+      console.error('Error checking campaign NPS settings:', settingsError);
+      // Continue anyway with default behavior
+    }
+    
+    // Use null for NPS score if not included in campaign
+    const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
+    
+    // IMPROVED CODE: Comprehensive check for duplicate submissions based on full metadata
+    let existingSubmission = null;
+    
+    if (metadata && Object.keys(metadata).length > 0) {
+      console.log('Checking for existing submissions with same metadata');
+      console.log('Current submission metadata:', JSON.stringify(metadata));
+      
+      // We'll look for submissions with the exact same metadata signature
+      const { data: existingSubmissions, error: queryError } = await serviceRoleClient
+        .from('feedback_submissions')
+        .select('id, metadata, created_at')
+        .eq('company_id', companyId)
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: false })
+        .limit(50);  // Check recent submissions
+    
+      if (queryError) {
+        console.error('Error querying existing submissions:', queryError);
+      } else if (existingSubmissions && existingSubmissions.length > 0) {
+        console.log(`Found ${existingSubmissions.length} previous submissions to check`);
+        
+        // Create signature for current metadata
+        const metadataSignature = createMetadataSignature(metadata);
+        console.log('Current metadata signature:', metadataSignature);
+        
+        // Check each submission's metadata to find a match
+        for (const submission of existingSubmissions) {
+          if (submission.metadata && Object.keys(submission.metadata).length > 0) {
+            console.log(`Comparing with submission ${submission.id}`);
+            
+            const existingSignature = createMetadataSignature(submission.metadata);
+            console.log('Existing signature:', existingSignature);
+            
+            if (metadataSignature === existingSignature) {
+              console.log(`Metadata MATCH found for submission: ${submission.id}`);
+              existingSubmission = submission;
+              break;
+            } else {
+              console.log('No metadata match with this submission');
+            }
+          }
+        }
+      }
+    }
+    
+    // Prepare the feedback data
+    const feedbackData = {
+      company_id: companyId,
+      campaign_id: campaignId,
+      order_id: orderIdToSave,
+      nps_score: finalNpsScore,
+      voice_file_url: voiceFileUrl,
+      transcription,
+      sentiment,
+      processed: false,
+      metadata: metadata
+    };
+    
+    let feedback;
+    let feedbackError;
+    
+    // Use the existing submission if found, otherwise create a new one
+    if (existingSubmission) {
+      console.log(`Updating existing submission: ${existingSubmission.id}`);
+      
+      // Update the existing submission with new data
+      const { data, error } = await serviceRoleClient
+        .from('feedback_submissions')
+        .update(feedbackData)
+        .eq('id', existingSubmission.id)
+        .select()
+        .single();
+        
+      feedback = data;
+      feedbackError = error;
+      
+      if (error) {
+        console.error('Error updating existing submission:', error);
+      } else {
+        console.log('Successfully updated existing submission:', data);
+      }
+    } else {
+      console.log('Creating new submission');
+      
+      // Create a new feedback submission
+      const { data, error } = await serviceRoleClient
+        .from('feedback_submissions')
+        .insert(feedbackData)
+        .select()
+        .single();
+        
+      feedback = data;
+      feedbackError = error;
+      
+      if (error) {
+        console.error('Error creating new submission:', error);
+      } else {
+        console.log('Successfully created new submission:', data);
+      }
+    }
+
+    if (feedbackError) {
+      console.error('Database error saving feedback:', feedbackError);
+      return NextResponse.json(
+        { error: 'Failed to save feedback' },
+        { status: 500 }
+      );
+    }
+
+    console.log('Feedback saved successfully:', feedback);
+
+    // Process question voice recordings - MODIFIED for longer recordings
     const questionVoiceFiles: Record<string, string> = {};
-    const questionTranscriptions: Record<string, string> = {};
+    const pendingVoiceTranscriptions: string[] = [];
     
     if (hasVoiceQuestions && voiceQuestionIds.length > 0) {
       console.log('Processing voice recordings for questions...');
@@ -179,13 +309,10 @@ export async function POST(request: NextRequest) {
             );
             questionVoiceFiles[questionId] = filePath;
             
-            // Transcribe the audio
-            const questionTranscription = await transcribeAudio(buffer);
-            if (questionTranscription) {
-              questionTranscriptions[questionId] = questionTranscription;
-            }
+            // Store file path and mark for async transcription
+            pendingVoiceTranscriptions.push(questionId);
             
-            console.log(`Processed audio for question ${questionId}, filePath: ${filePath}`);
+            console.log(`Uploaded audio for question ${questionId}, filePath: ${filePath}`);
           } catch (error) {
             console.error(`Error processing audio for question ${questionId}:`, error);
             // Continue with other questions rather than failing the entire submission
@@ -194,105 +321,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Convert empty string OrderID to null to ensure it's properly handled by the database
-    const orderIdToSave = orderId && orderId.trim() !== '' ? orderId : null;
-    console.log('Order ID to save to database:', orderIdToSave);
-
-    // Save feedback submission - using service role client
-    console.log('Saving feedback submission...');
-    
-    // First, check if the campaign has NPS enabled
-    const { data: campaignSettings, error: settingsError } = await serviceRoleClient
-      .from('feedback_campaigns')
-      .select('include_nps')
-      .eq('id', campaignId)
-      .single();
-      
-    if (settingsError) {
-      console.error('Error checking campaign NPS settings:', settingsError);
-      // Continue anyway with default behavior
-    }
-    
-    // Use null for NPS score if not included in campaign
-    const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
-    
-    // First check if we have an existing submission with this order ID
-console.log(`Checking for existing submissions for company: ${companyId}, campaign: ${campaignId}`);
-const { data: existingSubmissions, error: queryError } = await serviceRoleClient
-  .from('feedback_submissions')
-  .select('id, nps_score, metadata')
-  .eq('company_id', companyId)
-  .eq('campaign_id', campaignId)
-  .order('created_at', { ascending: false })
-  .limit(1);
-
-if (queryError) {
-  console.error('Error querying existing submissions:', queryError);
-  return NextResponse.json(
-    { error: 'Failed to check for existing submissions' },
-    { status: 500 }
-  );
-}
-
-let feedback;
-let feedbackError;
-
-if (existingSubmissions && existingSubmissions.length > 0) {
-  console.log('Found existing submission, updating it with additional feedback data');
-  // Update the existing submission with voice/text and additional data
-  const { data, error } = await serviceRoleClient
-    .from('feedback_submissions')
-    .update({
-      nps_score: finalNpsScore, // This might override with a new score if provided
-      voice_file_url: voiceFileUrl,
-      transcription,
-      sentiment,
-      processed: false,
-      // Note: We're not updating metadata to preserve original URL parameters
-    })
-    .eq('id', existingSubmissions[0].id)
-    .select()
-    .single();
-    
-  feedback = data;
-  feedbackError = error;
-} else {
-  console.log('No existing submission found, creating new one');
-  // No existing submission, create a new one
-  const { data, error } = await serviceRoleClient
-    .from('feedback_submissions')
-    .insert({
-      company_id: companyId,
-      campaign_id: campaignId,
-      order_id: orderIdToSave,
-      nps_score: finalNpsScore,
-      voice_file_url: voiceFileUrl,
-      transcription,
-      sentiment,
-      processed: false,
-      metadata: metadata
-    })
-    .select()
-    .single();
-    
-  feedback = data;
-  feedbackError = error;
-}
-
-if (feedbackError) {
-  console.error('Database error saving feedback:', feedbackError);
-  console.error('Error details:', feedbackError);
-  return NextResponse.json(
-    { error: 'Failed to save feedback' },
-    { status: 500 }
-  );
-}
-
-console.log('Feedback saved successfully:', feedback);
-
-    // Save question responses if any
-    if ((questionResponses || Object.keys(questionTranscriptions).length > 0) && feedback) {
+    // Save question responses - MODIFIED for pending transcriptions
+    if ((questionResponses || Object.keys(questionVoiceFiles).length > 0) && feedback) {
       console.log('About to save question responses. Feedback ID:', feedback.id);
+      
+      // If we're updating an existing submission, first delete any existing responses
+      if (existingSubmission) {
+        console.log('Deleting existing question responses for submission:', feedback.id);
+        const { error: deleteError } = await serviceRoleClient
+          .from('question_responses')
+          .delete()
+          .eq('feedback_submission_id', feedback.id);
+          
+        if (deleteError) {
+          console.error('Error deleting existing question responses:', deleteError);
+        } else {
+          console.log('Successfully deleted existing question responses');
+        }
+      }
       
       // Format text responses for insertion
       const questionResponsesArray = [];
@@ -305,20 +351,22 @@ console.log('Feedback saved successfully:', feedback);
             question_id: questionId,
             response_value: typeof value === 'string' ? value : JSON.stringify(value),
             voice_file_url: questionVoiceFiles[questionId] || null,
-            transcription: questionTranscriptions[questionId] || null
+            transcription: null,  // Will be updated asynchronously
+            transcription_status: questionVoiceFiles[questionId] ? 'pending' : null
           });
         }
       }
       
       // Add voice-only responses (if not already in text responses)
-      for (const questionId of Object.keys(questionTranscriptions)) {
+      for (const questionId of Object.keys(questionVoiceFiles)) {
         if (!questionResponses || !questionResponses[questionId]) {
           questionResponsesArray.push({
             feedback_submission_id: feedback.id,
             question_id: questionId,
             response_value: null, // No text response
             voice_file_url: questionVoiceFiles[questionId] || null,
-            transcription: questionTranscriptions[questionId] || null
+            transcription: null, // Will be updated asynchronously
+            transcription_status: 'pending'
           });
         }
       }
@@ -334,14 +382,35 @@ console.log('Feedback saved successfully:', feedback);
 
         if (responsesError) {
           console.error('Failed to save question responses:', responsesError);
-          console.error('Error details:', responsesError.details);
-          console.error('Error message:', responsesError.message);
         } else {
           console.log('Successfully saved responses:', savedResponses);
         }
       }
     } else {
       console.log('No question responses to save or no feedback ID available');
+    }
+
+    // Trigger transcription job asynchronously if needed
+    if (pendingVoiceTranscriptions.length > 0) {
+      try {
+        console.log('Triggering async transcription for question voice recordings');
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/process-transcriptions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            feedbackId: feedback.id,
+            questionIds: pendingVoiceTranscriptions
+          }),
+        }).catch(err => {
+          // Log but don't block on errors
+          console.error('Error triggering transcription job:', err);
+        });
+      } catch (error) {
+        console.error('Error starting async transcription:', error);
+        // Continue anyway - transcription will be handled later
+      }
     }
 
     // Check for Google Sheets connection and sync if exists
@@ -358,13 +427,8 @@ console.log('Feedback saved successfully:', feedback);
         // Format data for sheets, including both text and voice transcriptions
         const allResponses = { ...questionResponses };
         
-        // Add transcriptions from voice responses
-        for (const [questionId, transcriptionText] of Object.entries(questionTranscriptions)) {
-          if (!allResponses[questionId]) {
-            allResponses[questionId] = `[Voice] ${transcriptionText}`;
-          }
-        }
-        
+        // Add transcriptions from voice responses where available immediately
+        // Others will be updated later when transcription completes
         const formattedData = formatFeedbackForSheets({
           created_at: feedback.created_at,
           order_id: orderIdToSave || 'N/A',
@@ -392,7 +456,8 @@ console.log('Feedback saved successfully:', feedback);
     return NextResponse.json({ 
       success: true,
       feedback,
-      hasQuestionResponses: !!questionResponses || Object.keys(questionTranscriptions).length > 0
+      hasQuestionResponses: !!questionResponses || Object.keys(questionVoiceFiles).length > 0,
+      transcriptionsInProgress: pendingVoiceTranscriptions.length > 0
     });
   } catch (error) {
     console.error('Error processing feedback:', error);
@@ -401,4 +466,24 @@ console.log('Feedback saved successfully:', feedback);
       { status: 500 }
     );
   }
+}
+
+/**
+ * Creates a comprehensive hash/signature from the entire metadata object
+ * @param metadata The metadata object to hash
+ * @returns A string representing the unique signature of the metadata
+ */
+function createMetadataSignature(metadata: any): string | null {
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return null;
+  }
+  
+  // Sort keys for consistent ordering
+  const sortedKeys = Object.keys(metadata).sort();
+  
+  // Create a string of all key-value pairs, filtering out empty values
+  return sortedKeys
+    .filter(key => metadata[key] !== null && metadata[key] !== undefined && metadata[key] !== '')
+    .map(key => `${key}:${metadata[key]}`)
+    .join('|');
 }

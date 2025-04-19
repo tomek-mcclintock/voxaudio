@@ -33,6 +33,7 @@ interface FeedbackData {
     response_value: string;
     voice_file_url?: string | null;
     transcription?: string | null;
+    transcription_status?: string | null;
   }> | null;
 }
 
@@ -84,6 +85,24 @@ function formatResponseValue(value: string, voiceTranscription?: string | null):
   }
 }
 
+// Helper function to display transcription status
+function getTranscriptionStatus(status?: string | null) {
+  switch(status) {
+    case 'pending':
+      return <span className="text-yellow-500 text-xs font-medium">Processing...</span>;
+    case 'processing':
+      return <span className="text-blue-500 text-xs font-medium">Transcribing...</span>;
+    case 'completed':
+      return <span className="text-green-500 text-xs font-medium">Completed</span>;
+    case 'failed':
+      return <span className="text-red-500 text-xs font-medium">Failed</span>;
+    case 'file_error':
+      return <span className="text-red-500 text-xs font-medium">File Error</span>;
+    default:
+      return null;
+  }
+}
+
 export default function CampaignDetails({ params }: { params: { id: string } }) {
   const company = useCompany();
   const [campaign, setCampaign] = useState<CampaignData | null>(null);
@@ -94,10 +113,35 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
   const [summary, setSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'themes'
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchCampaignData();
-  }, [params.id]);
+    
+    // Set up refresh interval for pending transcriptions
+    const interval = setInterval(() => {
+      const hasPendingTranscriptions = feedback.some(item => 
+        item.question_responses?.some(r => 
+          r.transcription_status === 'pending' || r.transcription_status === 'processing'
+        )
+      );
+      
+      if (hasPendingTranscriptions) {
+        console.log('Refreshing data due to pending transcriptions');
+        fetchCampaignData();
+      } else if (refreshInterval) {
+        // Clear interval if no pending transcriptions
+        clearInterval(refreshInterval);
+        setRefreshInterval(null);
+      }
+    }, 10000); // Check every 10 seconds
+    
+    setRefreshInterval(interval);
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [params.id, feedback]);
 
   const fetchCampaignData = async () => {
     try {
@@ -262,6 +306,9 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
             // Check if it's a voice response with transcription
             if (response.transcription) {
               responseValue = `[Voice] ${response.transcription}`;
+            } else if (response.voice_file_url && response.transcription_status) {
+              // For pending transcriptions
+              responseValue = `[Voice - ${response.transcription_status}]`;
             } else if (response.response_value) {
               // Format text response
               try {
@@ -492,104 +539,110 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
 
           {/* Recent Feedback Table */}
           <div className="bg-white rounded-lg shadow">
-  <div className="p-6 border-b">
-    <h2 className="text-lg font-semibold">Recent Feedback</h2>
-  </div>
-  <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
-        <tr>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-          {campaign.include_nps && (
-            <>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NPS Score</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
-            </>
-          )}
-          {/* Dynamically create columns for custom questions */}
-          {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => (
-            <th key={question.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-              {question.text.length > 30 ? question.text.substring(0, 30) + '...' : question.text}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
-        {feedback.map((item, index) => (
-          <tr key={index}>
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {new Date(item.created_at).toLocaleDateString()}
-            </td>
-            
-            {/* NPS related columns - only if campaign includes NPS */}
-            {campaign.include_nps && (
-              <>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {item.nps_score !== null ? (
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
-                      item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {item.nps_score}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">N/A</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {item.sentiment || 'N/A'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
-                  {item.transcription ? (
-                    <div className="max-w-xl break-words whitespace-pre-wrap">
-                      {item.transcription}
-                    </div>
-                  ) : (
-                    'No voice feedback'
-                  )}
-                </td>
-              </>
-            )}
-            
-            {/* Question response columns - for all campaigns */}
-            {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => {
-              // Find the response for this question
-              const response = item.question_responses?.find(r => r.question_id === question.id);
-              
-              // Determine what to display
-              let displayValue = 'No response';
-              
-              if (response) {
-                // Check if it's a voice response
-                if (response.transcription) {
-                  displayValue = `[Voice] ${response.transcription}`;
-                } else if (response.response_value) {
-                  // Format text response
-                  try {
-                    // Try to parse JSON (for multiple choice, etc.)
-                    const parsed = JSON.parse(response.response_value);
-                    displayValue = typeof parsed === 'object' ? JSON.stringify(parsed) : parsed.toString();
-                  } catch (e) {
-                    // Just use the text as is
-                    displayValue = response.response_value;
-                  }
-                }
-              }
-              
-              return (
-                <td key={question.id} className="px-6 py-4 text-sm text-gray-500">
-                  <div className="max-w-xl break-words whitespace-pre-wrap">{displayValue}</div>
-                </td>
-              );
-            })}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</div>
+            <div className="p-6 border-b">
+              <h2 className="text-lg font-semibold">Recent Feedback</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    {campaign.include_nps && (
+                      <>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NPS Score</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
+                      </>
+                    )}
+                    {/* Dynamically create columns for custom questions */}
+                    {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => (
+                      <th key={question.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        {question.text.length > 30 ? question.text.substring(0, 30) + '...' : question.text}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {feedback.map((item, index) => (
+                    <tr key={index}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(item.created_at).toLocaleDateString()}
+                      </td>
+                      
+                      {/* NPS related columns - only if campaign includes NPS */}
+                      {campaign.include_nps && (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {item.nps_score !== null ? (
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
+                                item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {item.nps_score}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.sentiment || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {item.transcription ? (
+                              <div className="max-w-xl break-words whitespace-pre-wrap">
+                                {item.transcription}
+                              </div>
+                            ) : (
+                              'No voice feedback'
+                            )}
+                          </td>
+                        </>
+                      )}
+                      
+                      {/* Question response columns - for all campaigns */}
+                      {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => {
+                        // Find the response for this question
+                        const response = item.question_responses?.find(r => r.question_id === question.id);
+                        
+                        return (
+                          <td key={question.id} className="px-6 py-4 text-sm text-gray-500">
+                            {response ? (
+                              <div className="space-y-1">
+                                {/* If there's a voice response with transcription */}
+                                {response.transcription && (
+                                  <div className="max-w-xl break-words whitespace-pre-wrap">
+                                    <span className="text-blue-500 font-medium">[Voice]</span> {response.transcription}
+                                  </div>
+                                )}
+                                
+                                {/* For voice response pending transcription */}
+                                {response.voice_file_url && !response.transcription && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-blue-500 font-medium">[Voice]</span>
+                                    {getTranscriptionStatus(response.transcription_status)}
+                                  </div>
+                                )}
+                                
+                                {/* For text response */}
+                                {response.response_value && !response.transcription && (
+                                  <div className="max-w-xl break-words whitespace-pre-wrap">
+                                    {formatResponseValue(response.response_value)}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">No response</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>
       ) : (
         // Theme Analysis tab content
