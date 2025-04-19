@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         
         // Get the audio file from S3
         const { data: fileData, error: fileError } = await serviceRoleClient.storage
-          .from('recordings') // Make sure this matches your bucket name
+          .from('ruggable-feedback-recordings') // Make sure this matches your bucket name
           .download(response.voice_file_url);
           
         if (fileError || !fileData) {
