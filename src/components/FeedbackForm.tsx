@@ -147,17 +147,27 @@ export default function FeedbackForm({
   };
   
   const handleSubmit = async () => {
-    console.log("Starting submission with orderID:", localOrderId);
-    console.log("Starting submission with questionResponses:", questionResponses);
-    console.log("Starting submission with questionVoiceRecordings:", questionVoiceRecordings);
-    console.log("Campaign Data:", campaignData);  
+    const clientSubmissionId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    console.log(`[${clientSubmissionId}] Starting client-side submission process with orderID:`, localOrderId);
+    console.log(`[${clientSubmissionId}] Client-side questionResponses:`, questionResponses);
+    console.log(`[${clientSubmissionId}] Client-side questionVoiceRecordings:`, 
+      Object.keys(questionVoiceRecordings).map(key => ({
+        questionId: key, 
+        hasBlob: !!questionVoiceRecordings[key],
+        blobSize: questionVoiceRecordings[key]?.size || 0,
+        blobType: questionVoiceRecordings[key]?.type || 'none'
+      }))
+    );
+    
     if (!consent) {
       setError(t('form.consentRequired'));
+      console.log(`[${clientSubmissionId}] Submission blocked: consent required`);
       return;
     }
   
     if (campaignData?.include_nps && npsScore === null) {
       setError(t('form.npsRequired'));
+      console.log(`[${clientSubmissionId}] Submission blocked: NPS score required`);
       return;
     }
   
@@ -168,6 +178,7 @@ export default function FeedbackForm({
   
       if (missingRequired) {
         setError(t('form.requiredQuestions'));
+        console.log(`[${clientSubmissionId}] Submission blocked: required questions missing`);
         return;
       }
     }
@@ -178,19 +189,23 @@ export default function FeedbackForm({
     try {
       // Stop any ongoing recordings
       if (audioRecorderRef.current) {
+        console.log(`[${clientSubmissionId}] Stopping any active recordings`);
         audioRecorderRef.current.stopRecording();
       }
-    
+  
+      console.log(`[${clientSubmissionId}] Preparing form data for submission`);
       const formData = new FormData();
       
       // Handle NPS additional feedback
       if (campaignData?.include_nps) {
         if (feedbackType === 'voice' && audioBlob) {
+          console.log(`[${clientSubmissionId}] Adding main audio file: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
           formData.append('audio', audioBlob);
         } else if (feedbackType === 'text' && textFeedback) {
+          console.log(`[${clientSubmissionId}] Adding text feedback: ${textFeedback.length} characters`);
           formData.append('textFeedback', textFeedback);
         }
-      }
+      }  
       
       // Explicitly log the order ID we're adding to the form
       console.log('Adding orderId to form:', localOrderId);

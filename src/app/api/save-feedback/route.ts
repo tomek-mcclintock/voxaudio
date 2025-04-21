@@ -15,15 +15,22 @@ const serviceRoleClient = createClient(
 );
 
 export async function POST(request: NextRequest) {
+  // Add a unique identifier for this submission attempt for tracking
+  const submissionAttemptId = `voice-sub-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  console.log(`[${submissionAttemptId}] Starting feedback submission process...`);
+  
   try {
-    console.log('Starting feedback submission...');
-    
     const formData = await request.formData();
     
     // Log all FormData entries
-    console.log('Raw FormData entries:');
+    console.log(`[${submissionAttemptId}] Raw FormData entries:`);
     for (const pair of formData.entries()) {
-      console.log(pair[0], ':', pair[1]);
+      // For audio files, just log that they exist but not the content
+      if (pair[0] === 'audio' || pair[0].startsWith('question_audio_')) {
+        console.log(`[${submissionAttemptId}] ${pair[0]} : [Audio File Present - ${(pair[1] as Blob).size} bytes]`);
+      } else {
+        console.log(`[${submissionAttemptId}] ${pair[0]} : ${pair[1]}`);
+      }
     }
 
     const orderId = formData.get('orderId') as string;
@@ -33,6 +40,13 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get('audio') as Blob | null;
     const textFeedback = formData.get('textFeedback') as string | null;
     const questionResponsesStr = formData.get('questionResponses') as string | null;
+    
+    // New logging for audio availability
+    if (audioFile) {
+      console.log(`[${submissionAttemptId}] Main audio file detected: ${audioFile.size} bytes, type: ${audioFile.type}`);
+    } else {
+      console.log(`[${submissionAttemptId}] No main audio file in submission`);
+    }
     
     // New fields for question voice recordings
     const hasVoiceQuestions = formData.get('hasVoiceQuestions') === 'true';
@@ -45,36 +59,36 @@ export async function POST(request: NextRequest) {
     if (additionalParamsStr) {
       try {
         metadata = JSON.parse(additionalParamsStr);
-        console.log('Additional parameters:', metadata);
+        console.log(`[${submissionAttemptId}] Additional parameters:`, metadata);
       } catch (e) {
-        console.error('Failed to parse additionalParams:', e);
+        console.error(`[${submissionAttemptId}] Failed to parse additionalParams:`, e);
       }
     }
     
     if (hasVoiceQuestions && voiceQuestionIdsStr) {
       try {
         voiceQuestionIds = JSON.parse(voiceQuestionIdsStr);
-        console.log('Voice question IDs:', voiceQuestionIds);
+        console.log(`[${submissionAttemptId}] Voice question IDs:`, voiceQuestionIds);
       } catch (e) {
-        console.error('Failed to parse voice question IDs:', e);
+        console.error(`[${submissionAttemptId}] Failed to parse voice question IDs:`, e);
       }
     }
 
-    console.log('Order ID from form:', orderId);
-    console.log('Raw questionResponsesStr:', questionResponsesStr);
+    console.log(`[${submissionAttemptId}] Order ID from form:`, orderId);
+    console.log(`[${submissionAttemptId}] Raw questionResponsesStr:`, questionResponsesStr);
 
     let questionResponses = null;
     if (questionResponsesStr) {
       try {
         questionResponses = JSON.parse(questionResponsesStr);
-        console.log('Parsed questionResponses:', questionResponses);
+        console.log(`[${submissionAttemptId}] Parsed questionResponses:`, questionResponses);
       } catch (e) {
-        console.error('Failed to parse questionResponses:', e);
-        console.error('Parse error details:', e);
+        console.error(`[${submissionAttemptId}] Failed to parse questionResponses:`, e);
+        console.error(`[${submissionAttemptId}] Parse error details:`, e);
       }
     }
 
-    console.log('Processed form data:', { 
+    console.log(`[${submissionAttemptId}] Processed form data:`, { 
       orderId, 
       npsScore, 
       companyId, 
@@ -82,10 +96,10 @@ export async function POST(request: NextRequest) {
       hasAudio: !!audioFile,
       hasText: !!textFeedback,
       hasQuestionResponses: !!questionResponses,
-      questionResponses,
       hasVoiceQuestions,
       voiceQuestionIds
     });
+
 
     // Validate basic required fields
     if (!companyId || !campaignId) {
@@ -119,32 +133,40 @@ export async function POST(request: NextRequest) {
     // Process main audio feedback (related to NPS)
     if (audioFile) {
       try {
-        console.log('Processing main audio file...');
+        console.log(`[${submissionAttemptId}] Processing main audio file...`);
+        console.log(`[${submissionAttemptId}] Audio file type: ${audioFile.type}, size: ${audioFile.size} bytes`);
         const arrayBuffer = await audioFile.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-
-        console.log('Uploading to S3...');
+        console.log(`[${submissionAttemptId}] Successfully converted audio to buffer, size: ${buffer.length} bytes`);
+    
+        console.log(`[${submissionAttemptId}] Uploading to S3...`);
         voiceFileUrl = await uploadVoiceRecording(buffer, `${companyId}/${campaignId}/${orderId || 'no-order-id'}`);
-        console.log('S3 upload complete:', voiceFileUrl);
-
-        console.log('Transcribing audio...');
+        console.log(`[${submissionAttemptId}] S3 upload complete:`, voiceFileUrl);
+    
+        console.log(`[${submissionAttemptId}] Transcribing audio...`);
         transcription = await transcribeAudio(buffer);
-        console.log('Transcription complete:', transcription);
-
+        console.log(`[${submissionAttemptId}] Transcription complete:`, transcription ? transcription.substring(0, 100) + '...' : 'No transcription');
+    
         if (transcription) {
-          console.log('Analyzing feedback...');
+          console.log(`[${submissionAttemptId}] Analyzing feedback...`);
           const analysis = await analyzeFeedback(transcription);
           sentiment = analysis.sentiment;
-          console.log('Analysis complete:', sentiment);
+          console.log(`[${submissionAttemptId}] Analysis complete:`, sentiment);
         }
       } catch (error) {
-        console.error('Error processing audio:', error);
+        console.error(`[${submissionAttemptId}] Error processing audio:`, error);
+        // Log more details about the error
+        if (error instanceof Error) {
+          console.error(`[${submissionAttemptId}] Error name: ${error.name}, message: ${error.message}`);
+          console.error(`[${submissionAttemptId}] Error stack:`, error.stack);
+        }
         return NextResponse.json(
-          { error: 'Failed to process audio' },
+          { error: 'Failed to process audio', details: error instanceof Error ? error.message : String(error) },
           { status: 500 }
         );
       }
-    } else if (textFeedback) {
+    }
+    else if (textFeedback) {
       transcription = textFeedback;
       try {
         console.log('Analyzing text feedback...');
@@ -266,38 +288,50 @@ export async function POST(request: NextRequest) {
 
     // Process question voice recordings - MODIFIED for longer recordings
     const questionVoiceFiles: Record<string, string> = {};
-    const pendingVoiceTranscriptions: string[] = [];
+const pendingVoiceTranscriptions: string[] = [];
+
+if (hasVoiceQuestions && voiceQuestionIds.length > 0) {
+  console.log(`[${submissionAttemptId}] Processing voice recordings for ${voiceQuestionIds.length} questions...`);
+  
+  for (const questionId of voiceQuestionIds) {
+    const questionAudioFile = formData.get(`question_audio_${questionId}`) as Blob | null;
     
-    if (hasVoiceQuestions && voiceQuestionIds.length > 0) {
-      console.log('Processing voice recordings for questions...');
-      
-      for (const questionId of voiceQuestionIds) {
-        const questionAudioFile = formData.get(`question_audio_${questionId}`) as Blob | null;
+    if (questionAudioFile) {
+      try {
+        console.log(`[${submissionAttemptId}] Processing audio for question ${questionId}...`);
+        console.log(`[${submissionAttemptId}] Question audio file type: ${questionAudioFile.type}, size: ${questionAudioFile.size} bytes`);
+        const arrayBuffer = await questionAudioFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        console.log(`[${submissionAttemptId}] Successfully converted question audio to buffer, size: ${buffer.length} bytes`);
         
-        if (questionAudioFile) {
-          try {
-            console.log(`Processing audio for question ${questionId}...`);
-            const arrayBuffer = await questionAudioFile.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            
-            // Upload to S3 with a distinct path
-            const filePath = await uploadVoiceRecording(
-              buffer, 
-              `${companyId}/${campaignId}/question_${questionId}_${orderId || 'no-order-id'}`
-            );
-            questionVoiceFiles[questionId] = filePath;
-            
-            // Store file path and mark for async transcription
-            pendingVoiceTranscriptions.push(questionId);
-            
-            console.log(`Uploaded audio for question ${questionId}, filePath: ${filePath}`);
-          } catch (error) {
-            console.error(`Error processing audio for question ${questionId}:`, error);
-            // Continue with other questions rather than failing the entire submission
-          }
+        // Upload to S3 with a distinct path
+        const filePath = await uploadVoiceRecording(
+          buffer, 
+          `${companyId}/${campaignId}/question_${questionId}_${orderId || 'no-order-id'}`
+        );
+        questionVoiceFiles[questionId] = filePath;
+        
+        // Store file path and mark for async transcription
+        pendingVoiceTranscriptions.push(questionId);
+        
+        console.log(`[${submissionAttemptId}] Uploaded audio for question ${questionId}, filePath: ${filePath}`);
+      } catch (error) {
+        console.error(`[${submissionAttemptId}] Error processing audio for question ${questionId}:`, error);
+        // Log more details about the error
+        if (error instanceof Error) {
+          console.error(`[${submissionAttemptId}] Error name: ${error.name}, message: ${error.message}`);
+          console.error(`[${submissionAttemptId}] Error stack:`, error.stack);
         }
+        // Continue with other questions rather than failing the entire submission
       }
+    } else {
+      console.log(`[${submissionAttemptId}] No audio file found for question ${questionId}`);
     }
+  }
+} else {
+  console.log(`[${submissionAttemptId}] No voice questions to process`);
+}
+
 
     // Save question responses - MODIFIED for pending transcriptions
     if ((questionResponses || Object.keys(questionVoiceFiles).length > 0) && feedback) {

@@ -156,36 +156,58 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
     };
 
     const startRecording = async () => {
+      const recordingId = `recording-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      console.log(`[${recordingId}] Starting audio recording...`);
+      
       try {
+        console.log(`[${recordingId}] Requesting microphone access...`);
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log(`[${recordingId}] Microphone access granted`);
         streamRef.current = stream;
-
+    
+        console.log(`[${recordingId}] Setting up audio context and analyzer...`);
         const audioContext = new AudioContext();
         const source = audioContext.createMediaStreamSource(stream);
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
         analyserRef.current = analyser;
-
+    
+        console.log(`[${recordingId}] Creating MediaRecorder...`);
         const mediaRecorder = new MediaRecorder(stream);
+        console.log(`[${recordingId}] MediaRecorder created with mimeType: ${mediaRecorder.mimeType}`);
         mediaRecorderRef.current = mediaRecorder;
         chunksRef.current = [];
-
+    
         mediaRecorder.ondataavailable = (e) => {
           if (e.data.size > 0) {
+            console.log(`[${recordingId}] Audio chunk received: ${e.data.size} bytes`);
             chunksRef.current.push(e.data);
+          } else {
+            console.log(`[${recordingId}] Empty audio chunk received`);
           }
         };
-
+    
         mediaRecorder.onstop = () => {
+          console.log(`[${recordingId}] MediaRecorder stopped, combining chunks...`);
+          console.log(`[${recordingId}] Number of chunks: ${chunksRef.current.length}`);
+          let totalSize = 0;
+          chunksRef.current.forEach((chunk, i) => {
+            totalSize += chunk.size;
+            console.log(`[${recordingId}] Chunk ${i+1}: ${chunk.size} bytes, type: ${chunk.type}`);
+          });
+          
           const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          console.log(`[${recordingId}] Final audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
           setAudioBlob(audioBlob);
           onRecordingComplete(audioBlob);
         };
-
+    
+        console.log(`[${recordingId}] Starting MediaRecorder...`);
         mediaRecorder.start();
         setIsRecording(true);
         setRecordingTime(0);
+    
         if (enableGamification) {
           setFadingMessage(progressMessages.initial);
         }
@@ -208,23 +230,58 @@ const AudioRecorder = forwardRef<AudioRecorderRef, AudioRecorderProps>(
     };
 
     const handleStopRecording = () => {
+      const stopId = `stop-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      
       if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-        setIsRecording(false);
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
+        console.log(`[${stopId}] Stopping MediaRecorder...`);
+        
+        try {
+          // Check recording state before stopping
+          console.log(`[${stopId}] MediaRecorder state before stopping: ${mediaRecorderRef.current.state}`);
+          
+          if (mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            console.log(`[${stopId}] MediaRecorder stopped successfully`);
+          } else {
+            console.log(`[${stopId}] MediaRecorder not in recording state, can't stop`);
+          }
+          
+          setIsRecording(false);
+          
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            console.log(`[${stopId}] Recording timer cleared`);
+          }
+          
+          if (streamRef.current) {
+            console.log(`[${stopId}] Stopping all tracks in stream...`);
+            streamRef.current.getTracks().forEach(track => {
+              console.log(`[${stopId}] Stopping track: ${track.kind}, ID: ${track.id}`);
+              track.stop();
+            });
+            console.log(`[${stopId}] All tracks stopped`);
+          }
+          
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            console.log(`[${stopId}] Animation frame canceled`);
+          }
+          
+          if (fadeTimeoutRef.current) {
+            clearTimeout(fadeTimeoutRef.current);
+            console.log(`[${stopId}] Fade timeout cleared`);
+          }
+        } catch (error) {
+          console.error(`[${stopId}] Error during recording stop:`, error);
+          if (error instanceof Error) {
+            console.error(`[${stopId}] Error name: ${error.name}, message: ${error.message}`);
+            console.error(`[${stopId}] Error stack:`, error.stack);
+          }
         }
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-        }
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-        if (fadeTimeoutRef.current) {
-          clearTimeout(fadeTimeoutRef.current);
-        }
+      } else {
+        console.log(`[${stopId}] No MediaRecorder to stop`);
       }
-    };
+    };    
 
     const discardRecording = () => {
       if (audioRef.current) {
