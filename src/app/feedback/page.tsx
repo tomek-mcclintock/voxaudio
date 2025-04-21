@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import FeedbackForm from '@/components/FeedbackForm';
 import Header from '@/components/Header';
 import type { Campaign } from '@/types/campaign';
+import { generateUniqueSubmissionId } from '@/lib/utils';
 
 async function saveInitialNpsScore(
   serviceClient: any, 
@@ -20,23 +21,60 @@ async function saveInitialNpsScore(
   try {
     console.log(`Saving initial NPS score: ${npsScore} for company: ${companyId}, campaign: ${campaignId}`);
     
-    // Create a minimal submission with just the NPS score and metadata
-    await serviceClient
+    // Generate the same unique identifier we'll use in other places
+    const submissionData = {
+      orderId: orderId || null,
+      companyId,
+      campaignId,
+      additionalParams
+    };
+    
+    const submissionId = generateUniqueSubmissionId(submissionData);
+    console.log('Generated submission ID for initial NPS:', submissionId);
+    
+    // Check if a submission with this ID already exists
+    const { data: existingSubmission, error: queryError } = await serviceClient
       .from('feedback_submissions')
-      .insert({
-        company_id: companyId,
-        campaign_id: campaignId,
-        order_id: orderId || null,
-        nps_score: npsScore,
-        metadata: additionalParams,
-        processed: false,
-      });
+      .select('id, nps_score')
+      .eq('submission_identifier', submissionId)
+      .maybeSingle();
+    
+    if (queryError) {
+      console.error('Error checking for existing submission:', queryError);
+      // Continue to create a new one - better to have duplicate than lose data
+    }
+    
+    if (existingSubmission) {
+      // Update the existing submission
+      console.log(`Updating existing submission with ID: ${existingSubmission.id}`);
+      await serviceClient
+        .from('feedback_submissions')
+        .update({
+          nps_score: npsScore,
+          metadata: additionalParams
+        })
+        .eq('id', existingSubmission.id);
+    } else {
+      // Create a minimal submission with just the NPS score and metadata
+      await serviceClient
+        .from('feedback_submissions')
+        .insert({
+          company_id: companyId,
+          campaign_id: campaignId,
+          order_id: orderId || null,
+          nps_score: npsScore,
+          metadata: additionalParams,
+          processed: false,
+          submission_identifier: submissionId // Store the unique identifier
+        });
+    }
     
     console.log('Initial NPS score saved successfully');
   } catch (error) {
     console.error('Error saving initial NPS score:', error);
   }
 }
+
 
 export default async function FeedbackPage({
   searchParams,
