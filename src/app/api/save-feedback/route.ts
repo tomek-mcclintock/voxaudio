@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { uploadVoiceRecording } from '@/lib/s3';
 import { transcribeAudio, analyzeFeedback } from '@/lib/openai';
+import { generateUniqueSubmissionId } from '@/lib/utils';  // Add this import
 
 export const runtime = 'nodejs';
 
@@ -174,49 +175,26 @@ export async function POST(request: NextRequest) {
     // Use null for NPS score if not included in campaign
     const finalNpsScore = (campaignSettings && !campaignSettings.include_nps) ? null : npsScore;
     
-    // IMPROVED CODE: Comprehensive check for duplicate submissions based on full metadata
-    let existingSubmission = null;
+    // Generate unique submission identifier
+    const submissionData = {
+      orderId: orderIdToSave,
+      companyId,
+      campaignId,
+      additionalParams: metadata
+    };
     
-    if (metadata && Object.keys(metadata).length > 0) {
-      console.log('Checking for existing submissions with same metadata');
-      console.log('Current submission metadata:', JSON.stringify(metadata));
-      
-      // We'll look for submissions with the exact same metadata signature
-      const { data: existingSubmissions, error: queryError } = await serviceRoleClient
-        .from('feedback_submissions')
-        .select('id, metadata, created_at')
-        .eq('company_id', companyId)
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: false })
-        .limit(50);  // Check recent submissions
+    const submissionId = generateUniqueSubmissionId(submissionData);
+    console.log('Generated submission ID:', submissionId);
     
-      if (queryError) {
-        console.error('Error querying existing submissions:', queryError);
-      } else if (existingSubmissions && existingSubmissions.length > 0) {
-        console.log(`Found ${existingSubmissions.length} previous submissions to check`);
-        
-        // Create signature for current metadata
-        const metadataSignature = createMetadataSignature(metadata);
-        console.log('Current metadata signature:', metadataSignature);
-        
-        // Check each submission's metadata to find a match
-        for (const submission of existingSubmissions) {
-          if (submission.metadata && Object.keys(submission.metadata).length > 0) {
-            console.log(`Comparing with submission ${submission.id}`);
-            
-            const existingSignature = createMetadataSignature(submission.metadata);
-            console.log('Existing signature:', existingSignature);
-            
-            if (metadataSignature === existingSignature) {
-              console.log(`Metadata MATCH found for submission: ${submission.id}`);
-              existingSubmission = submission;
-              break;
-            } else {
-              console.log('No metadata match with this submission');
-            }
-          }
-        }
-      }
+    // Check for existing submission with this unique ID
+    const { data: existingSubmission, error: queryError } = await serviceRoleClient
+      .from('feedback_submissions')
+      .select('id, metadata, created_at')
+      .eq('submission_identifier', submissionId)
+      .maybeSingle();
+    
+    if (queryError) {
+      console.error('Error querying existing submissions:', queryError);
     }
     
     // Prepare the feedback data
@@ -229,7 +207,8 @@ export async function POST(request: NextRequest) {
       transcription,
       sentiment,
       processed: false,
-      metadata: metadata
+      metadata: metadata,
+      submission_identifier: submissionId  // Store the unique identifier
     };
     
     let feedback;
@@ -426,24 +405,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Creates a comprehensive hash/signature from the entire metadata object
- * @param metadata The metadata object to hash
- * @returns A string representing the unique signature of the metadata
- */
-function createMetadataSignature(metadata: any): string | null {
-  if (!metadata || Object.keys(metadata).length === 0) {
-    return null;
-  }
-  
-  // Sort keys for consistent ordering
-  const sortedKeys = Object.keys(metadata).sort();
-  
-  // Create a string of all key-value pairs, filtering out empty values
-  return sortedKeys
-    .filter(key => metadata[key] !== null && metadata[key] !== undefined && metadata[key] !== '')
-    .map(key => `${key}:${metadata[key]}`)
-    .join('|');
 }

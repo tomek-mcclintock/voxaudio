@@ -18,3 +18,81 @@ export function getCompanyFromDomain(domain: string): string | null {
     return domain;
   }
 }
+
+// src/lib/utils.ts (add this function to your existing file)
+
+/**
+ * Generates a unique submission identifier based on available customer data
+ * @param data Object containing submission data
+ * @returns A unique string identifier for this customer submission
+ */
+export function generateUniqueSubmissionId(data: {
+  orderId?: string | null;
+  companyId: string;
+  campaignId: string;
+  additionalParams?: Record<string, any>;
+}): string {
+  // Extract the most reliable identifiers from the data
+  const identifiers = [];
+  
+  // Order ID if available
+  if (data.orderId && data.orderId.trim() !== '') {
+    identifiers.push(`order:${data.orderId}`);
+  }
+  
+  // Extract key identification parameters
+  if (data.additionalParams) {
+    // Customer email
+    if (data.additionalParams.email) {
+      identifiers.push(`email:${data.additionalParams.email.toLowerCase()}`);
+    }
+    
+    // Customer ID if present
+    if (data.additionalParams.customerId || data.additionalParams.customer_id) {
+      identifiers.push(`customer:${data.additionalParams.customerId || data.additionalParams.customer_id}`);
+    }
+    
+    // Transaction ID if present
+    if (data.additionalParams.transactionId || data.additionalParams.transaction_id) {
+      identifiers.push(`transaction:${data.additionalParams.transactionId || data.additionalParams.transaction_id}`);
+    }
+    
+    // Session ID if captured
+    if (data.additionalParams.sessionId) {
+      identifiers.push(`session:${data.additionalParams.sessionId}`);
+    }
+
+    // User ID if available
+    if (data.additionalParams.userId || data.additionalParams.user_id) {
+      identifiers.push(`user:${data.additionalParams.userId || data.additionalParams.user_id}`);
+    }
+    
+    // Any klaviyo ID if present (common in email marketing)
+    if (data.additionalParams.klaviyoId || data.additionalParams.klaviyo_id) {
+      identifiers.push(`klaviyo:${data.additionalParams.klaviyoId || data.additionalParams.klaviyo_id}`);
+    }
+  }
+  
+  // Always include company and campaign to namespace properly
+  identifiers.push(`company:${data.companyId}`);
+  identifiers.push(`campaign:${data.campaignId}`);
+  
+  // If we have very few identifiers, the ID won't be robust
+  if (identifiers.length < 3) {
+    // Add all remaining parameters as fallback
+    if (data.additionalParams) {
+      Object.entries(data.additionalParams).forEach(([key, value]) => {
+        // Skip keys we've already processed
+        const processedKeys = ['email', 'customerId', 'customer_id', 'transactionId', 
+                              'transaction_id', 'sessionId', 'userId', 'user_id',
+                              'klaviyoId', 'klaviyo_id'];
+        if (!processedKeys.includes(key) && value && String(value).trim() !== '') {
+          identifiers.push(`${key}:${String(value)}`);
+        }
+      });
+    }
+  }
+  
+  // Sort for consistency and join with a separator
+  return identifiers.sort().join('|');
+}
