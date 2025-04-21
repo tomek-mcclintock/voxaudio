@@ -14,7 +14,8 @@ async function saveInitialNpsScore(
   campaignId: string, 
   npsScore: number, 
   orderId: string,
-  additionalParams: Record<string, string>
+  additionalParams: Record<string, string>,
+  clientId?: string // Add this parameter
 ) {
   if (npsScore === null || !companyId || !campaignId) return;
   
@@ -26,7 +27,8 @@ async function saveInitialNpsScore(
       orderId: orderId || null,
       companyId,
       campaignId,
-      additionalParams
+      additionalParams,
+      clientId
     };
     
     const submissionId = generateUniqueSubmissionId(submissionData);

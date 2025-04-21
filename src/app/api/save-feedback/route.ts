@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get('audio') as Blob | null;
     const textFeedback = formData.get('textFeedback') as string | null;
     const questionResponsesStr = formData.get('questionResponses') as string | null;
+    const clientId = formData.get('clientId') as string;
     
     // New logging for audio availability
     if (audioFile) {
@@ -202,7 +203,8 @@ export async function POST(request: NextRequest) {
       orderId: orderIdToSave,
       companyId,
       campaignId,
-      additionalParams: metadata
+      additionalParams: metadata,
+      clientId
     };
     
     const submissionId = generateUniqueSubmissionId(submissionData);
@@ -230,7 +232,8 @@ export async function POST(request: NextRequest) {
       sentiment,
       processed: false,
       metadata: metadata,
-      submission_identifier: submissionId  // Store the unique identifier
+      submission_identifier: submissionId,  // Store the unique identifier
+      browser_client_id: clientId || null
     };
     
     let feedback;

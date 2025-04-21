@@ -1,7 +1,7 @@
 // src/components/FeedbackForm.tsx
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AudioRecorder, { AudioRecorderRef } from './AudioRecorder';
 import { Mic, MessageSquare } from 'lucide-react';
 import type { CompanyContextType } from '@/lib/contexts/CompanyContext';
@@ -9,6 +9,7 @@ import type { Campaign, CampaignQuestion } from '@/types/campaign';
 import { TextQuestion, RatingQuestion, MultipleChoiceQuestion, YesNoQuestion } from './questions/QuestionTypes';
 import { translate } from '@/lib/translations';
 import VoiceTextQuestion from './questions/VoiceTextQuestion';
+
 
 interface FeedbackFormProps {
   orderId: string;
@@ -72,6 +73,24 @@ export default function FeedbackForm({
   const t = (key: string, replacements: Record<string, string> = {}) => {
     return translate(language, key, replacements);
   };
+
+  const [clientId, setClientId] = useState<string>('');
+
+useEffect(() => {
+  // Generate a session-based identifier
+  const existingClientId = sessionStorage.getItem('voxaudio_client_id');
+  
+  if (existingClientId) {
+    setClientId(existingClientId);
+  } else {
+    // Generate a simple random ID - could be more sophisticated in production
+    const newClientId = Math.random().toString(36).substring(2) + 
+                        Date.now().toString(36);
+    sessionStorage.setItem('voxaudio_client_id', newClientId);
+    setClientId(newClientId);
+  }
+}, []);
+
   
   const [npsScore, setNpsScore] = useState<number | null>(initialNpsScore ?? null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -94,6 +113,7 @@ export default function FeedbackForm({
     campaignData.settings.enableGamification : true; // Default to true if not specified
 
     const updateNpsScore = async (newScore: number) => {
+      const updateData = new FormData();
       // First update the local state
       setNpsScore(newScore);
       
@@ -124,6 +144,9 @@ export default function FeedbackForm({
         console.error('Error updating NPS score:', error);
         // Don't display an error to the user or disrupt the form
       }
+      if (clientId) {
+        updateData.append('clientId', clientId);
+      }
     };  
   
   const handleQuestionResponse = (questionId: string, value: any) => {
@@ -147,6 +170,7 @@ export default function FeedbackForm({
   };
   
   const handleSubmit = async () => {
+    const formData = new FormData();
     const clientSubmissionId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     console.log(`[${clientSubmissionId}] Starting client-side submission process with orderID:`, localOrderId);
     console.log(`[${clientSubmissionId}] Client-side questionResponses:`, questionResponses);
@@ -171,6 +195,10 @@ export default function FeedbackForm({
       return;
     }
   
+    if (clientId) {
+      formData.append('clientId', clientId);
+    }    
+
     if (campaignData?.include_additional_questions) {
       const missingRequired = campaignData.questions.some(
         q => q.required && !questionResponses[q.id] && !questionVoiceRecordings[q.id]

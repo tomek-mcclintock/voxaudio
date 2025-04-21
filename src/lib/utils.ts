@@ -31,6 +31,7 @@ export function generateUniqueSubmissionId(data: {
   companyId: string;
   campaignId: string;
   additionalParams?: Record<string, any>;
+  clientId?: string; // New parameter
 }): string {
   // Extract the most reliable identifiers from the data
   const identifiers = [];
@@ -71,28 +72,24 @@ export function generateUniqueSubmissionId(data: {
     if (data.additionalParams.klaviyoId || data.additionalParams.klaviyo_id) {
       identifiers.push(`klaviyo:${data.additionalParams.klaviyoId || data.additionalParams.klaviyo_id}`);
     }
+      if (data.clientId) {
+    identifiers.push(`client:${data.clientId}`);
+  }
+  // Add client ID if available - this makes each browser session unique
+  if (data.clientId) {
+    identifiers.push(`client:${data.clientId}`);
+  }
   }
   
   // Always include company and campaign to namespace properly
   identifiers.push(`company:${data.companyId}`);
   identifiers.push(`campaign:${data.campaignId}`);
   
-  // If we have very few identifiers, the ID won't be robust
-  if (identifiers.length < 3) {
-    // Add all remaining parameters as fallback
-    if (data.additionalParams) {
-      Object.entries(data.additionalParams).forEach(([key, value]) => {
-        // Skip keys we've already processed
-        const processedKeys = ['email', 'customerId', 'customer_id', 'transactionId', 
-                              'transaction_id', 'sessionId', 'userId', 'user_id',
-                              'klaviyoId', 'klaviyo_id'];
-        if (!processedKeys.includes(key) && value && String(value).trim() !== '') {
-          identifiers.push(`${key}:${String(value)}`);
-        }
-      });
-    }
+  // If we have very few identifiers (just company/campaign) and no client ID, 
+  // add timestamp as last resort
+  if (identifiers.length < 3 && !data.clientId) {
+    identifiers.push(`timestamp:${Date.now()}`);
   }
   
-  // Sort for consistency and join with a separator
   return identifiers.sort().join('|');
 }

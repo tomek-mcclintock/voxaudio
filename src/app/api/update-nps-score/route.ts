@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     const npsScoreStr = formData.get('npsScore') as string;
     const npsScore = npsScoreStr ? parseInt(npsScoreStr) : null;
     const orderId = formData.get('orderId') as string;
+    const clientId = formData.get('clientId') as string;
     
     if (!companyId || !campaignId || npsScore === null) {
       console.error('Missing required fields for NPS update');
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest) {
       orderId,
       companyId,
       campaignId,
-      additionalParams: metadata
+      additionalParams: metadata,
+      clientId // Add this line
     };
     
     const submissionId = generateUniqueSubmissionId(submissionData);
