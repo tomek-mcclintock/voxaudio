@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { uploadVoiceRecording } from '@/lib/s3';
 import { transcribeAudio, analyzeFeedback } from '@/lib/openai';
-import { appendToSheet, formatFeedbackForSheets } from '@/lib/googleSheets';
 
 export const runtime = 'nodejs';
 
@@ -410,45 +409,6 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('Error starting async transcription:', error);
         // Continue anyway - transcription will be handled later
-      }
-    }
-
-    // Check for Google Sheets connection and sync if exists
-    console.log('Checking for Google Sheets connection...');
-    const { data: sheetsConnection } = await serviceRoleClient
-      .from('google_sheets_connections')
-      .select('*')
-      .eq('campaign_id', campaignId)
-      .single();
-
-    if (sheetsConnection) {
-      console.log('Found Google Sheets connection, syncing data...');
-      try {
-        // Format data for sheets, including both text and voice transcriptions
-        const allResponses = { ...questionResponses };
-        
-        // Add transcriptions from voice responses where available immediately
-        // Others will be updated later when transcription completes
-        const formattedData = formatFeedbackForSheets({
-          created_at: feedback.created_at,
-          order_id: orderIdToSave || 'N/A',
-          nps_score: npsScore,
-          transcription: transcription,
-          sentiment: sentiment,
-          ...Object.keys(allResponses).length > 0 && { responses: JSON.stringify(allResponses) }
-        });
-
-        await appendToSheet(
-          sheetsConnection.refresh_token,
-          sheetsConnection.spreadsheet_id,
-          sheetsConnection.sheet_name,
-          formattedData
-        );
-
-        console.log('Successfully synced to Google Sheets');
-      } catch (error) {
-        console.error('Error syncing to Google Sheets:', error);
-        // Don't fail the submission if Google Sheets sync fails
       }
     }
 
