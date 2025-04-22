@@ -30,66 +30,88 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
       throw new Error('Audio file exceeds 25MB limit');
     }
     
-    console.log(`[${transcriptionId}] API Key prefix: ${process.env.OPENAI_API_KEY?.substring(0, 3)}...`);
-    
     try {
-      // Specify an explicit response format and model
-      const response = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-1",
-        response_format: "text", // Explicitly request text format
-        temperature: 0, // Lower temperature for more accurate transcription
-      });
+      // Try multiple languages to get the best transcription
+      const languages = ["en", "de"]; // English and German
+      let bestTranscription = "";
+      let bestLength = 0;
       
-      // When response_format is "text", the response itself is a string
-      const transcriptionText = response as string;
-      
-      console.log(`[${transcriptionId}] Transcription successful, length: ${transcriptionText.length} characters`);
-      if (transcriptionText.length > 0) {
-        console.log(`[${transcriptionId}] Transcription sample: "${transcriptionText.substring(0, 100)}..."`);
-      } else {
-        console.log(`[${transcriptionId}] Warning: Empty transcription received`);
+      for (const language of languages) {
+        console.log(`[${transcriptionId}] Attempting transcription with language: ${language}`);
+        
+        try {
+          const response = await openai.audio.transcriptions.create({
+            file: audioFile,
+            model: "whisper-1",
+            response_format: "text",
+            temperature: 0,
+            language: language,
+            prompt: "This is customer feedback that may be in English or German about product quality."
+          });
+          
+          // When response_format is "text", the response itself is a string
+          const transcriptionText = response as string;
+          
+          console.log(`[${transcriptionId}] ${language} transcription: "${transcriptionText.substring(0, 100)}..."`);
+          
+          // Keep the longest, most meaningful transcription
+          if (transcriptionText.length > bestLength && 
+              !transcriptionText.includes("MBC 뉴스") && // Filter out Korean TV station markers
+              !transcriptionText.match(/^Let'?s get /i)) { // Filter out common misrecognitions
+            bestTranscription = transcriptionText;
+            bestLength = transcriptionText.length;
+          }
+        } catch (langError) {
+          console.error(`[${transcriptionId}] Error with ${language} transcription:`, langError);
+        }
       }
-
-      return transcriptionText;
+      
+      if (bestTranscription) {
+        console.log(`[${transcriptionId}] Best transcription (${bestLength} chars): "${bestTranscription.substring(0, 100)}..."`);
+        return bestTranscription;
+      }
+      
+      // If no good transcription was found, try one more format
+      console.log(`[${transcriptionId}] No good transcription found, trying with WAV format...`);
+      
     } catch (openaiError) {
       console.error(`[${transcriptionId}] OpenAI API error:`, openaiError);
+    }
+    
+    // Try again with WAV format if we're here
+    console.log(`[${transcriptionId}] Trying with WAV format...`);
+    
+    const wavBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+    const wavFile = new File([wavBlob], 'audio.wav', { type: 'audio/wav' });
+    
+    console.log(`[${transcriptionId}] Created WAV file: size=${wavFile.size} bytes`);
+    
+    try {
+      const response = await openai.audio.transcriptions.create({
+        file: wavFile,
+        model: "whisper-1",
+        response_format: "text",
+        temperature: 0,
+        language: "auto" // Let Whisper detect the language
+      });
       
-      // Try one more time with a different format if the first attempt failed
-      console.log(`[${transcriptionId}] Retrying with wav format...`);
+      const transcriptionText = response as string;
       
-      // Try again with WAV format
-      const wavBlob = new Blob([audioBuffer], { type: 'audio/wav' });
-      const wavFile = new File([wavBlob], 'audio.wav', { type: 'audio/wav' });
-      
-      console.log(`[${transcriptionId}] Created WAV file: size=${wavFile.size} bytes`);
-      
-      try {
-        const secondResponse = await openai.audio.transcriptions.create({
-          file: wavFile,
-          model: "whisper-1",
-          response_format: "text",
-        });
-        
-        // Again, handle string response
-        const secondTranscriptionText = secondResponse as string;
-        
-        console.log(`[${transcriptionId}] Second attempt successful, length: ${secondTranscriptionText.length} characters`);
-        return secondTranscriptionText;
-      } catch (secondError) {
-        console.error(`[${transcriptionId}] Second attempt also failed:`, secondError);
-        throw secondError;
-      }
+      console.log(`[${transcriptionId}] WAV transcription: "${transcriptionText.substring(0, 100)}..."`);
+      return transcriptionText;
+    } catch (wavError) {
+      console.error(`[${transcriptionId}] WAV transcription failed:`, wavError);
+      throw wavError;
     }
   } catch (error) {
     console.error(`[${transcriptionId}] Transcription failed:`, error);
     if (error instanceof Error) {
       console.error(`[${transcriptionId}] Error name: ${error.name}, message: ${error.message}`);
-      console.error(`[${transcriptionId}] Error stack:`, error.stack);
     }
     throw error; // Re-throw to be handled by the caller
   }
 }
+
 
 export async function analyzeFeedback(text: string): Promise<{
   sentiment: string;

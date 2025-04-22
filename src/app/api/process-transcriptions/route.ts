@@ -102,17 +102,23 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { feedbackId, questionIds } = await request.json();
+    const { feedbackId, questionIds, forceReprocess = false } = await request.json();
     
-    console.log(`Processing transcriptions for feedback: ${feedbackId}, questions: ${questionIds}`);
+    console.log(`Processing transcriptions for feedback: ${feedbackId}, questions: ${questionIds}, forceReprocess: ${forceReprocess}`);
     
     // Get the question responses that need to be processed
-    const { data: responses, error: fetchError } = await serviceRoleClient
+    let query = serviceRoleClient
       .from('question_responses')
       .select('id, question_id, voice_file_url, transcription_status')
       .eq('feedback_submission_id', feedbackId)
-      .in('question_id', questionIds)
-      .eq('transcription_status', 'pending');
+      .in('question_id', questionIds);
+      
+    // If not forcing reprocess, only get pending ones
+    if (!forceReprocess) {
+      query = query.eq('transcription_status', 'pending');
+    }
+    
+    const { data: responses, error: fetchError } = await query;
       
     if (fetchError) {
       console.error('Error fetching responses:', fetchError);
@@ -120,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (!responses || responses.length === 0) {
-      console.log('No pending transcriptions found');
+      console.log('No transcriptions found to process');
       return NextResponse.json({ success: true, message: 'No transcriptions to process' });
     }
     
