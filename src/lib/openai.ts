@@ -11,12 +11,12 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
   console.log(`[${transcriptionId}] Starting audio transcription, buffer size: ${audioBuffer.length} bytes`);
   
   try {
-    // Use webm as a more reliable format
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
+    // Use mp3 as a more reliable format
+    const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
     console.log(`[${transcriptionId}] Created Blob object: type=${audioBlob.type}, size=${audioBlob.size} bytes`);
     
-    // Note: changing the file extension from webm to webm
-    const audioFile = new File([audioBlob], 'audio.webm', { type: 'audio/webm' });
+    // Note: changing the file extension from webm to mp3
+    const audioFile = new File([audioBlob], 'audio.mp3', { type: 'audio/mp3' });
     console.log(`[${transcriptionId}] Created File object: name=${audioFile.name}, type=${audioFile.type}, size=${audioFile.size} bytes`);
 
     console.log(`[${transcriptionId}] Sending to OpenAI Whisper API...`);
