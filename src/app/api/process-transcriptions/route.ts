@@ -25,47 +25,77 @@ const s3 = new S3Client({
 
 // Helper function to convert stream to buffer
 async function streamToBuffer(stream: any): Promise<Buffer> {
+  console.log("Stream type:", typeof stream, stream.constructor ? stream.constructor.name : 'unknown');
+  
   return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
     
-    // Handle different types of streams
-    if (stream instanceof Readable) {
-      // Node.js Readable stream
-      stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-      stream.on('error', (err) => reject(err));
-      stream.on('end', () => resolve(Buffer.concat(chunks)));
-    } else if (typeof stream.transformToByteArray === 'function') {
-      // AWS SDK v3 stream with transformToByteArray method
-      stream.transformToByteArray()
-        .then((data: Uint8Array) => resolve(Buffer.from(data)))
-        .catch(reject);
-    } else if (typeof stream.transformToString === 'function') {
-      // AWS SDK v3 stream with transformToString method
-      stream.transformToString()
-        .then((data: string) => resolve(Buffer.from(data)))
-        .catch(reject);
-    } else if (stream.getReader) {
-      // Web ReadableStream
-      const reader = stream.getReader();
-      const readChunk = async () => {
-        try {
-          const result = await reader.read();
-          // Properly type the result with explicit interface
-          const { done, value } = result as { done: boolean; value: Uint8Array };
-          
-          if (done) {
-            resolve(Buffer.concat(chunks));
-            return;
+    try {
+      // For AWS SDK v3 Body which might be a ReadableStream
+      if (stream && typeof stream.transformToByteArray === 'function') {
+        console.log("Using transformToByteArray method");
+        stream.transformToByteArray()
+          .then((data: Uint8Array) => {
+            console.log("transformToByteArray successful, length:", data.length);
+            resolve(Buffer.from(data));
+          })
+          .catch((err: any) => {
+            console.error("transformToByteArray failed:", err);
+            reject(err);
+          });
+        return;
+      }
+      
+      // For Node.js Readable stream
+      if (stream && typeof stream.on === 'function') {
+        console.log("Using Node.js Readable stream handling");
+        stream.on('data', (chunk: any) => {
+          console.log("Received chunk, size:", chunk.length);
+          chunks.push(Buffer.from(chunk));
+        });
+        stream.on('error', (err: any) => {
+          console.error("Stream error:", err);
+          reject(err);
+        });
+        stream.on('end', () => {
+          console.log("Stream ended, total chunks:", chunks.length);
+          resolve(Buffer.concat(chunks));
+        });
+        return;
+      }
+      
+      // For browser ReadableStream
+      if (stream && typeof stream.getReader === 'function') {
+        console.log("Using browser ReadableStream handling");
+        const reader = stream.getReader();
+        const readChunk = async () => {
+          try {
+            const result = await reader.read();
+            const { done, value } = result as { done: boolean; value: Uint8Array };
+            
+            if (done) {
+              console.log("ReadableStream done, total chunks:", chunks.length);
+              resolve(Buffer.concat(chunks));
+              return;
+            }
+            
+            console.log("ReadableStream chunk size:", value.length);
+            chunks.push(Buffer.from(value));
+            readChunk();
+          } catch (error) {
+            console.error("ReadableStream error:", error);
+            reject(error);
           }
-          chunks.push(Buffer.from(value));
-          readChunk();
-        } catch (error) {
-          reject(error);
-        }
-      };
-      readChunk();
-    } else {
-      reject(new Error('Unknown stream type'));
+        };
+        readChunk();
+        return;
+      }
+      
+      // If we get here, we couldn't handle the stream
+      reject(new Error(`Unrecognized stream type: ${typeof stream}`));
+    } catch (error) {
+      console.error("Fatal error in streamToBuffer:", error);
+      reject(error);
     }
   });
 }
@@ -129,6 +159,8 @@ export async function POST(request: NextRequest) {
             throw new Error('Empty response body from S3');
           }
           
+          console.log(`S3 response received, Body type: ${typeof s3Response.Body}, constructor: ${s3Response.Body.constructor ? s3Response.Body.constructor.name : 'unknown'}`);
+          
           // Convert stream to buffer using our helper function
           console.log('Converting S3 response stream to buffer');
           const buffer = await streamToBuffer(s3Response.Body);
@@ -152,6 +184,8 @@ export async function POST(request: NextRequest) {
           console.log(`Successfully updated database with transcription for response ${response.id}`);
         } catch (s3Error) {
           console.error(`Error accessing S3 for response ${response.id}:`, s3Error);
+          console.error(`Error details: ${s3Error instanceof Error ? s3Error.message : 'Unknown error'}`);
+          console.error(`Error stack: ${s3Error instanceof Error ? s3Error.stack : 'No stack trace'}`);
           
           // Mark as file error
           await serviceRoleClient
