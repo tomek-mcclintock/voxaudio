@@ -45,7 +45,6 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
     const response = await openai.audio.transcriptions.create({
       file: webmFile,
       model: "whisper-1",
-      language: "auto", // Let OpenAI detect the language
       response_format: "text"
     });
     
@@ -65,7 +64,6 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
       const response = await openai.audio.transcriptions.create({
         file: wavFile,
         model: "whisper-1",
-        language: "auto",
         response_format: "text"
       });
       
