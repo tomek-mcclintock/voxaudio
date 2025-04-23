@@ -6,49 +6,57 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// In src/lib/openai.ts
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
   const transcriptionId = `transcribe-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   console.log(`[${transcriptionId}] Starting audio transcription, buffer size: ${audioBuffer.length} bytes`);
   
   try {
-    // Create a temporary file with the audio data
-    const tempFilePath = `/tmp/audio-${transcriptionId}.mp3`;
-    const fs = require('fs');
-    fs.writeFileSync(tempFilePath, audioBuffer);
+    // Create a proper WebM file instead of an "MP3"
+    const webmBlob = new Blob([audioBuffer], { type: 'audio/webm' });
+    console.log(`[${transcriptionId}] Created WebM Blob: type=${webmBlob.type}, size=${webmBlob.size} bytes`);
     
-    console.log(`[${transcriptionId}] Wrote audio to temp file: ${tempFilePath}`);
+    // Use correct filename and MIME type
+    const webmFile = new File([webmBlob], 'audio.webm', { type: 'audio/webm' });
+    console.log(`[${transcriptionId}] Created WebM File: name=${webmFile.name}, type=${webmFile.type}, size=${webmFile.size} bytes`);
+
+    // Send to OpenAI
+    const response = await openai.audio.transcriptions.create({
+      file: webmFile,
+      model: "whisper-1",
+      language: "auto", // Let OpenAI detect the language
+      response_format: "text"
+    });
     
-    // Create a file object from the path
-    const audioFile = fs.createReadStream(tempFilePath);
+    const transcriptionText = response as string;
     
-    try {
-      // Attempt transcription with auto language detection
-      const response = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-1",
-        response_format: "verbose_json", // Get more details about the transcription
-      });
-      
-      // Clean up the temp file
-      fs.unlinkSync(tempFilePath);
-      
-      if (response.text) {
-        console.log(`[${transcriptionId}] Transcription successful (${response.language}): "${response.text.substring(0, 100)}..."`);
-        return response.text;
-      } else {
-        throw new Error("No transcription returned");
-      }
-    } catch (error) {
-      // Clean up the temp file
-      try { fs.unlinkSync(tempFilePath); } catch (e) {}
-      throw error;
-    }
+    console.log(`[${transcriptionId}] Transcription successful: "${transcriptionText.substring(0, 100)}..."`);
+    return transcriptionText;
   } catch (error) {
     console.error(`[${transcriptionId}] Transcription failed:`, error);
-    throw error;
+    
+    // If sending as WebM fails, try explicitly sending as WAV
+    try {
+      console.log(`[${transcriptionId}] Attempting with WAV format`);
+      const wavBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+      const wavFile = new File([wavBlob], 'audio.wav', { type: 'audio/wav' });
+      
+      const response = await openai.audio.transcriptions.create({
+        file: wavFile,
+        model: "whisper-1",
+        language: "auto",
+        response_format: "text"
+      });
+      
+      const transcriptionText = response as string;
+      console.log(`[${transcriptionId}] WAV transcription successful: "${transcriptionText.substring(0, 100)}..."`);
+      return transcriptionText;
+    } catch (wavError) {
+      console.error(`[${transcriptionId}] WAV attempt also failed:`, wavError);
+      throw error; // Throw the original error
+    }
   }
 }
+
 
 
 export async function analyzeFeedback(text: string): Promise<{
