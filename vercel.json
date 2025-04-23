@@ -1,7 +1,8 @@
 {
-  "buildpacks": [
-    {
-      "slug": "ffmpeg"
-    }
-  ]
-}
+    "crons": [
+      {
+        "path": "/api/cron/daily-analysis?secret=1qaz2wsx3edc4rfv",
+        "schedule": "0 1 * * *"
+      }
+    ]
+  }
