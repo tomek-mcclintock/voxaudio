@@ -6,3 +6,11 @@
       }
     ]
   }
+
+{
+  "buildpacks": [
+    {
+      "slug": "ffmpeg"
+    }
+  ]
+}
