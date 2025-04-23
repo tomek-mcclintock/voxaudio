@@ -6,109 +6,48 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// In src/lib/openai.ts
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
   const transcriptionId = `transcribe-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   console.log(`[${transcriptionId}] Starting audio transcription, buffer size: ${audioBuffer.length} bytes`);
   
   try {
-    // Use mp3 as a more reliable format
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
-    console.log(`[${transcriptionId}] Created Blob object: type=${audioBlob.type}, size=${audioBlob.size} bytes`);
+    // Create a temporary file with the audio data
+    const tempFilePath = `/tmp/audio-${transcriptionId}.mp3`;
+    const fs = require('fs');
+    fs.writeFileSync(tempFilePath, audioBuffer);
     
-    // Note: changing the file extension from webm to mp3
-    const audioFile = new File([audioBlob], 'audio.mp3', { type: 'audio/mp3' });
-    console.log(`[${transcriptionId}] Created File object: name=${audioFile.name}, type=${audioFile.type}, size=${audioFile.size} bytes`);
-
-    console.log(`[${transcriptionId}] Sending to OpenAI Whisper API...`);
+    console.log(`[${transcriptionId}] Wrote audio to temp file: ${tempFilePath}`);
     
-    // Additional validation for audio file
-    if (audioFile.size === 0) {
-      throw new Error('Audio file is empty');
-    }
-    
-    if (audioFile.size > 25 * 1024 * 1024) {
-      throw new Error('Audio file exceeds 25MB limit');
-    }
+    // Create a file object from the path
+    const audioFile = fs.createReadStream(tempFilePath);
     
     try {
-      // Try multiple languages to get the best transcription
-      const languages = ["en", "de"]; // English and German
-      let bestTranscription = "";
-      let bestLength = 0;
-      
-      for (const language of languages) {
-        console.log(`[${transcriptionId}] Attempting transcription with language: ${language}`);
-        
-        try {
-          const response = await openai.audio.transcriptions.create({
-            file: audioFile,
-            model: "whisper-1",
-            response_format: "text",
-            temperature: 0,
-            language: language,
-            prompt: "This is customer feedback that may be in English or German about product quality."
-          });
-          
-          // When response_format is "text", the response itself is a string
-          const transcriptionText = response as string;
-          
-          console.log(`[${transcriptionId}] ${language} transcription: "${transcriptionText.substring(0, 100)}..."`);
-          
-          // Keep the longest, most meaningful transcription
-          if (transcriptionText.length > bestLength && 
-              !transcriptionText.includes("MBC 뉴스") && // Filter out Korean TV station markers
-              !transcriptionText.match(/^Let'?s get /i)) { // Filter out common misrecognitions
-            bestTranscription = transcriptionText;
-            bestLength = transcriptionText.length;
-          }
-        } catch (langError) {
-          console.error(`[${transcriptionId}] Error with ${language} transcription:`, langError);
-        }
-      }
-      
-      if (bestTranscription) {
-        console.log(`[${transcriptionId}] Best transcription (${bestLength} chars): "${bestTranscription.substring(0, 100)}..."`);
-        return bestTranscription;
-      }
-      
-      // If no good transcription was found, try one more format
-      console.log(`[${transcriptionId}] No good transcription found, trying with WAV format...`);
-      
-    } catch (openaiError) {
-      console.error(`[${transcriptionId}] OpenAI API error:`, openaiError);
-    }
-    
-    // Try again with WAV format if we're here
-    console.log(`[${transcriptionId}] Trying with WAV format...`);
-    
-    const wavBlob = new Blob([audioBuffer], { type: 'audio/wav' });
-    const wavFile = new File([wavBlob], 'audio.wav', { type: 'audio/wav' });
-    
-    console.log(`[${transcriptionId}] Created WAV file: size=${wavFile.size} bytes`);
-    
-    try {
+      // Attempt transcription with auto language detection
       const response = await openai.audio.transcriptions.create({
-        file: wavFile,
+        file: audioFile,
         model: "whisper-1",
-        response_format: "text",
-        temperature: 0,
-        language: "auto" // Let Whisper detect the language
+        language: "auto",
+        response_format: "verbose_json", // Get more details about the transcription
       });
       
-      const transcriptionText = response as string;
+      // Clean up the temp file
+      fs.unlinkSync(tempFilePath);
       
-      console.log(`[${transcriptionId}] WAV transcription: "${transcriptionText.substring(0, 100)}..."`);
-      return transcriptionText;
-    } catch (wavError) {
-      console.error(`[${transcriptionId}] WAV transcription failed:`, wavError);
-      throw wavError;
+      if (response.text) {
+        console.log(`[${transcriptionId}] Transcription successful (${response.language}): "${response.text.substring(0, 100)}..."`);
+        return response.text;
+      } else {
+        throw new Error("No transcription returned");
+      }
+    } catch (error) {
+      // Clean up the temp file
+      try { fs.unlinkSync(tempFilePath); } catch (e) {}
+      throw error;
     }
   } catch (error) {
     console.error(`[${transcriptionId}] Transcription failed:`, error);
-    if (error instanceof Error) {
-      console.error(`[${transcriptionId}] Error name: ${error.name}, message: ${error.message}`);
-    }
-    throw error; // Re-throw to be handled by the caller
+    throw error;
   }
 }
 
@@ -123,7 +62,7 @@ export async function analyzeFeedback(text: string): Promise<{
     messages: [
       {
         role: "system",
-        content: "You are analyzing customer feedback for Ruggable UK. You will respond with JSON containing a 'sentiment' (positive/negative/neutral), a brief 'summary', and key 'themes' identified as an array."
+        content: "You are analyzing customer feedback. You will respond with JSON containing a 'sentiment' (positive/negative/neutral), a brief 'summary', and key 'themes' identified as an array."
       },
       {
         role: "user",
