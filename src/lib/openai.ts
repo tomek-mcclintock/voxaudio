@@ -27,7 +27,6 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
       const response = await openai.audio.transcriptions.create({
         file: audioFile,
         model: "whisper-1",
-        language: "auto",
         response_format: "verbose_json", // Get more details about the transcription
       });
       
