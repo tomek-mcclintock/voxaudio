@@ -9,32 +9,48 @@ const serviceRoleClient = createClient(
 );
 
 export async function GET(request: NextRequest) {
-  // Add cache control headers to prevent caching
-  const headers = new Headers({
-    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-    'Pragma': 'no-cache',
-    'Expires': '0',
-  });
-
-  try {
-    // Check for specific IDs to process
-    const specificId = request.nextUrl.searchParams.get('id');
-    
-    let query = serviceRoleClient
-      .from('question_responses')
-      .select('id, feedback_submission_id, question_id, transcription_status, voice_file_url');
-    
-    // If a specific ID is provided, only process that one
-    if (specificId) {
-      console.log(`Processing specific question response ID: ${specificId}`);
-      query = query.eq('id', specificId);
-    } else {
+    // Add cache control headers to prevent caching
+    const headers = new Headers({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+  
+    try {
+      // Check for specific IDs to process
+      const specificId = request.nextUrl.searchParams.get('id');
+      const responseId = request.nextUrl.searchParams.get('responseId');
+      
+      let query = serviceRoleClient
+        .from('question_responses')
+        .select(`
+          id, 
+          feedback_submission_id, 
+          question_id, 
+          transcription_status, 
+          voice_file_url,
+          transcription,
+          feedback_submissions!inner (
+            id,
+            campaign_id
+          )
+        `);
+      
+      // If a specific response ID is provided
+      if (responseId) {
+        query = query.eq('id', responseId);
+      }
+      // If a specific feedback ID is provided
+      else if (specificId) {
+        query = query.eq('feedback_submission_id', specificId);
+      } 
       // Otherwise, get all pending/failed
-      query = query.in('transcription_status', ['pending', 'pending_retry', 'failed', 'file_error'])
-        .limit(10); // Process in smaller batches
-    }
-    
-    const { data: pendingResponses, error: fetchError } = await query;
+      else {
+        query = query.in('transcription_status', ['pending', 'pending_retry', 'failed', 'file_error'])
+          .limit(10); 
+      }
+      
+      const { data: pendingResponses, error: fetchError } = await query;
       
     if (fetchError) {
       console.error('Error fetching responses:', fetchError);

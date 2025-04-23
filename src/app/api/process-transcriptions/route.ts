@@ -1,7 +1,7 @@
 // src/app/api/process-transcriptions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { transcribeAudio } from '@/lib/openai';
+import { transcribeWithAssemblyAI } from '@/lib/assembly-ai'; // Update import
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 
@@ -25,22 +25,20 @@ const s3 = new S3Client({
 
 // Helper function to convert stream to buffer
 async function streamToBuffer(stream: any): Promise<Buffer> {
-  console.log("Stream type:", typeof stream, stream.constructor ? stream.constructor.name : 'unknown');
-  
+  // Existing streamToBuffer function code...
   return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
     
     try {
       // For AWS SDK v3 Body which might be a ReadableStream
       if (stream && typeof stream.transformToByteArray === 'function') {
-        console.log("Using transformToByteArray method");
         stream.transformToByteArray()
           .then((data: Uint8Array) => {
-            console.log("transformToByteArray successful, length:", data.length);
+            console.log("Successfully used transformToByteArray, length:", data.length);
             resolve(Buffer.from(data));
           })
           .catch((err: any) => {
-            console.error("transformToByteArray failed:", err);
+            console.error("Error in transformToByteArray:", err);
             reject(err);
           });
         return;
@@ -48,9 +46,8 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
       
       // For Node.js Readable stream
       if (stream && typeof stream.on === 'function') {
-        console.log("Using Node.js Readable stream handling");
         stream.on('data', (chunk: any) => {
-          console.log("Received chunk, size:", chunk.length);
+          console.log("Got chunk of size:", chunk.length);
           chunks.push(Buffer.from(chunk));
         });
         stream.on('error', (err: any) => {
@@ -66,11 +63,11 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
       
       // For browser ReadableStream
       if (stream && typeof stream.getReader === 'function') {
-        console.log("Using browser ReadableStream handling");
         const reader = stream.getReader();
         const readChunk = async () => {
           try {
             const result = await reader.read();
+            // Properly type the result with explicit interface
             const { done, value } = result as { done: boolean; value: Uint8Array };
             
             if (done) {
@@ -78,7 +75,6 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
               resolve(Buffer.concat(chunks));
               return;
             }
-            
             console.log("ReadableStream chunk size:", value.length);
             chunks.push(Buffer.from(value));
             readChunk();
@@ -165,7 +161,7 @@ export async function POST(request: NextRequest) {
             throw new Error('Empty response body from S3');
           }
           
-          console.log(`S3 response received, Body type: ${typeof s3Response.Body}, constructor: ${s3Response.Body.constructor ? s3Response.Body.constructor.name : 'unknown'}`);
+          console.log('S3 response received, Body type:', typeof s3Response.Body, s3Response.Body.constructor ? s3Response.Body.constructor.name : 'unknown');
           
           // Convert stream to buffer using our helper function
           console.log('Converting S3 response stream to buffer');
@@ -173,9 +169,9 @@ export async function POST(request: NextRequest) {
           
           console.log(`Successfully downloaded file, size: ${buffer.length} bytes`);
           
-          // Transcribe the audio
-          console.log(`Transcribing audio for response ${response.id}`);
-          const transcription = await transcribeAudio(buffer);
+          // Transcribe the audio using Assembly AI instead of OpenAI
+          console.log(`Transcribing audio for response ${response.id} with Assembly AI`);
+          const transcription = await transcribeWithAssemblyAI(buffer);
           console.log(`Transcription complete for response ${response.id}: "${transcription.substring(0, 50)}..."`);
           
           // Update the response with the transcription
@@ -189,9 +185,8 @@ export async function POST(request: NextRequest) {
             
           console.log(`Successfully updated database with transcription for response ${response.id}`);
         } catch (s3Error) {
-          console.error(`Error accessing S3 for response ${response.id}:`, s3Error);
+          console.error(`Error accessing S3 or transcribing for response ${response.id}:`, s3Error);
           console.error(`Error details: ${s3Error instanceof Error ? s3Error.message : 'Unknown error'}`);
-          console.error(`Error stack: ${s3Error instanceof Error ? s3Error.stack : 'No stack trace'}`);
           
           // Mark as file error
           await serviceRoleClient
