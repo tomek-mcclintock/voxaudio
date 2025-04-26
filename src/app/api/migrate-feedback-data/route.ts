@@ -11,7 +11,6 @@ const serviceRoleClient = createClient(
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes
 
-// Define a type for the error objects
 interface MigrationError {
   submissionId: string;
   error: string;
@@ -26,15 +25,16 @@ interface MigrationResults {
   errors: MigrationError[];
 }
 
+
 export async function GET(request: NextRequest) {
   try {
     console.log('Starting feedback data migration...');
     
-    // Get all feedback submissions with transcriptions or voice files
+    // Get all feedback submissions with transcriptions or voice files - MODIFIED QUERY
     const { data: submissions, error: fetchError } = await serviceRoleClient
       .from('feedback_submissions')
       .select('id, company_id, campaign_id, transcription, voice_file_url, nps_score')
-      .or('transcription.neq.null,voice_file_url.neq.null,nps_score.neq.null')
+      .or('transcription.neq.null,voice_file_url.neq.null')
       .order('created_at', { ascending: false });
     
     if (fetchError) {
@@ -43,7 +43,6 @@ export async function GET(request: NextRequest) {
     
     console.log(`Found ${submissions?.length || 0} submissions to migrate`);
     
-    // Initialize results with proper typing
     const results: MigrationResults = {
       total: submissions?.length || 0,
       processed: 0,
@@ -51,12 +50,13 @@ export async function GET(request: NextRequest) {
       npsScoresMigrated: 0,
       errors: []
     };
+
     
     // Process each submission
     for (const submission of submissions || []) {
       try {
         // Check if we already have an 'nps_score' entry for this submission
-        const { data: existingNpsResponse, error: checkError } = await serviceRoleClient
+        const { data: existingResponses, error: checkError } = await serviceRoleClient
           .from('question_responses')
           .select('id')
           .eq('feedback_submission_id', submission.id)
@@ -64,11 +64,11 @@ export async function GET(request: NextRequest) {
           .maybeSingle();
           
         if (checkError) {
-          throw new Error(`Error checking existing NPS response: ${checkError.message}`);
+          throw new Error(`Error checking existing responses: ${checkError.message}`);
         }
         
-        // If NPS entry exists, update it
-        if (existingNpsResponse) {
+        // If NPS feedback entry exists, update it
+        if (existingResponses) {
           console.log(`Updating existing NPS response for submission ${submission.id}`);
           
           const updates: any = {};
@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
           // Add NPS score if available
           if (submission.nps_score !== null) {
             updates.response_value = submission.nps_score.toString();
+            results.npsScoresMigrated++;
           }
           
           // Add transcription if available
@@ -88,45 +89,57 @@ export async function GET(request: NextRequest) {
           // Add voice file URL if available
           if (submission.voice_file_url) {
             updates.voice_file_url = submission.voice_file_url;
+            if (!updates.transcription_status) {
+              updates.transcription_status = 'pending_retry';
+            }
           }
           
-          const { error: updateError } = await serviceRoleClient
-            .from('question_responses')
-            .update(updates)
-            .eq('id', existingNpsResponse.id);
-            
-          if (updateError) {
-            throw new Error(`Failed to update NPS response: ${updateError.message}`);
+          // Only update if we have changes to make
+          if (Object.keys(updates).length > 0) {
+            const { error: updateError } = await serviceRoleClient
+              .from('question_responses')
+              .update(updates)
+              .eq('id', existingResponses.id);
+              
+            if (updateError) {
+              throw new Error(`Failed to update response: ${updateError.message}`);
+            }
           }
         } else {
-          // Create new consolidated NPS entry
-          const newNpsResponse: any = {
+          // Create new entry for NPS feedback
+          const newResponse: any = {
             feedback_submission_id: submission.id,
             question_id: 'nps_score',
-            response_value: submission.nps_score !== null ? submission.nps_score.toString() : null
           };
+          
+          // Add NPS score if available
+          if (submission.nps_score !== null) {
+            newResponse.response_value = submission.nps_score.toString();
+            results.npsScoresMigrated++;
+          }
           
           // Add transcription if available
           if (submission.transcription) {
-            newNpsResponse.transcription = submission.transcription;
-            newNpsResponse.transcription_status = 'completed';
+            newResponse.transcription = submission.transcription;
+            newResponse.transcription_status = 'completed';
             results.transcriptionsMigrated++;
           }
           
           // Add voice file URL if available
           if (submission.voice_file_url) {
-            newNpsResponse.voice_file_url = submission.voice_file_url;
+            newResponse.voice_file_url = submission.voice_file_url;
+            if (!newResponse.transcription_status) {
+              newResponse.transcription_status = 'pending_retry';
+            }
           }
           
           const { error: insertError } = await serviceRoleClient
             .from('question_responses')
-            .insert([newNpsResponse]);
+            .insert([newResponse]);
             
           if (insertError) {
-            throw new Error(`Failed to insert NPS response: ${insertError.message}`);
+            throw new Error(`Failed to insert response: ${insertError.message}`);
           }
-          
-          results.npsScoresMigrated++;
         }
         
         results.processed++;
