@@ -55,27 +55,31 @@ export async function GET(request: NextRequest) {
     // Process each submission
     for (const submission of submissions || []) {
       try {
-        // Check if we already have an 'nps_feedback' entry for this submission
-        const { data: existingResponses, error: checkError } = await serviceRoleClient
+        // Check if we already have an 'nps_score' entry for this submission
+        const { data: existingNpsResponse, error: checkError } = await serviceRoleClient
           .from('question_responses')
           .select('id')
           .eq('feedback_submission_id', submission.id)
-          .eq('question_id', 'nps_feedback')
+          .eq('question_id', 'nps_score')
           .maybeSingle();
           
         if (checkError) {
-          throw new Error(`Error checking existing responses: ${checkError.message}`);
+          throw new Error(`Error checking existing NPS response: ${checkError.message}`);
         }
         
-        // If NPS feedback entry exists, update it
-        if (existingResponses) {
+        // If NPS entry exists, update it
+        if (existingNpsResponse) {
           console.log(`Updating existing NPS response for submission ${submission.id}`);
           
           const updates: any = {};
           
+          // Add NPS score if available
+          if (submission.nps_score !== null) {
+            updates.response_value = submission.nps_score.toString();
+          }
+          
           // Add transcription if available
           if (submission.transcription) {
-            updates.response_value = submission.transcription;
             updates.transcription = submission.transcription;
             updates.transcription_status = 'completed';
             results.transcriptionsMigrated++;
@@ -89,77 +93,37 @@ export async function GET(request: NextRequest) {
           const { error: updateError } = await serviceRoleClient
             .from('question_responses')
             .update(updates)
-            .eq('id', existingResponses.id);
+            .eq('id', existingNpsResponse.id);
             
           if (updateError) {
-            throw new Error(`Failed to update response: ${updateError.message}`);
+            throw new Error(`Failed to update NPS response: ${updateError.message}`);
           }
         } else {
-          // Create new entry for NPS feedback
-          const newResponse: any = {
+          // Create new consolidated NPS entry
+          const newNpsResponse: any = {
             feedback_submission_id: submission.id,
-            question_id: 'nps_feedback',
+            question_id: 'nps_score',
+            response_value: submission.nps_score !== null ? submission.nps_score.toString() : null
           };
           
           // Add transcription if available
           if (submission.transcription) {
-            newResponse.response_value = submission.transcription;
-            newResponse.transcription = submission.transcription;
-            newResponse.transcription_status = 'completed';
+            newNpsResponse.transcription = submission.transcription;
+            newNpsResponse.transcription_status = 'completed';
             results.transcriptionsMigrated++;
           }
           
           // Add voice file URL if available
           if (submission.voice_file_url) {
-            newResponse.voice_file_url = submission.voice_file_url;
+            newNpsResponse.voice_file_url = submission.voice_file_url;
           }
           
           const { error: insertError } = await serviceRoleClient
             .from('question_responses')
-            .insert([newResponse]);
+            .insert([newNpsResponse]);
             
           if (insertError) {
-            throw new Error(`Failed to insert response: ${insertError.message}`);
-          }
-        }
-        
-        // Create or update NPS score entry
-        if (submission.nps_score !== null) {
-          // Check if we already have an 'nps_score' entry
-          const { data: existingNPS, error: npsCheckError } = await serviceRoleClient
-            .from('question_responses')
-            .select('id')
-            .eq('feedback_submission_id', submission.id)
-            .eq('question_id', 'nps_score')
-            .maybeSingle();
-            
-          if (npsCheckError) {
-            throw new Error(`Error checking existing NPS score: ${npsCheckError.message}`);
-          }
-          
-          if (existingNPS) {
-            // Update existing NPS entry
-            const { error: npsUpdateError } = await serviceRoleClient
-              .from('question_responses')
-              .update({ response_value: submission.nps_score.toString() })
-              .eq('id', existingNPS.id);
-              
-            if (npsUpdateError) {
-              throw new Error(`Failed to update NPS score: ${npsUpdateError.message}`);
-            }
-          } else {
-            // Create new NPS entry
-            const { error: npsInsertError } = await serviceRoleClient
-              .from('question_responses')
-              .insert([{
-                feedback_submission_id: submission.id,
-                question_id: 'nps_score',
-                response_value: submission.nps_score.toString()
-              }]);
-              
-            if (npsInsertError) {
-              throw new Error(`Failed to insert NPS score: ${npsInsertError.message}`);
-            }
+            throw new Error(`Failed to insert NPS response: ${insertError.message}`);
           }
           
           results.npsScoresMigrated++;
