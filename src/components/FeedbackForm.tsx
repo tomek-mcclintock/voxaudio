@@ -76,30 +76,26 @@ export default function FeedbackForm({
 
   const [clientId, setClientId] = useState<string>('');
 
-useEffect(() => {
-  // Generate a session-based identifier
-  const existingClientId = sessionStorage.getItem('voxaudio_client_id');
-  
-  if (existingClientId) {
-    setClientId(existingClientId);
-  } else {
-    // Generate a simple random ID - could be more sophisticated in production
-    const newClientId = Math.random().toString(36).substring(2) + 
-                        Date.now().toString(36);
-    sessionStorage.setItem('voxaudio_client_id', newClientId);
-    setClientId(newClientId);
-  }
-}, []);
-
+  useEffect(() => {
+    // Generate a session-based identifier
+    const existingClientId = sessionStorage.getItem('voxaudio_client_id');
+    
+    if (existingClientId) {
+      setClientId(existingClientId);
+    } else {
+      // Generate a simple random ID - could be more sophisticated in production
+      const newClientId = Math.random().toString(36).substring(2) + 
+                          Date.now().toString(36);
+      sessionStorage.setItem('voxaudio_client_id', newClientId);
+      setClientId(newClientId);
+    }
+  }, []);
   
   const [npsScore, setNpsScore] = useState<number | null>(initialNpsScore ?? null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [textFeedback, setTextFeedback] = useState('');
-  const [feedbackType, setFeedbackType] = useState<'voice' | 'text'>(
-    campaignData?.settings?.allowVoice ? 'voice' : 'text'
-  );
   const [questionResponses, setQuestionResponses] = useState<Record<string, any>>({});
-  // New state for voice recordings per question
+  // State for voice recordings per question
   const [questionVoiceRecordings, setQuestionVoiceRecordings] = useState<Record<string, Blob | null>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -112,42 +108,44 @@ useEffect(() => {
   const isGamificationEnabled = campaignData?.settings?.enableGamification !== undefined ? 
     campaignData.settings.enableGamification : true; // Default to true if not specified
 
-    const updateNpsScore = async (newScore: number) => {
+  const updateNpsScore = async (newScore: number) => {
+    const updateData = new FormData();
+    // First update the local state
+    setNpsScore(newScore);
+    
+    // Then send an update to the server to record this change
+    try {
+      console.log(`Updating NPS score to ${newScore}`);
       const updateData = new FormData();
-      // First update the local state
-      setNpsScore(newScore);
+      updateData.append('companyId', companyId);
+      updateData.append('campaignId', campaignId || '');
+      updateData.append('npsScore', newScore.toString());
+      updateData.append('orderId', localOrderId || '');
       
-      // Then send an update to the server to record this change
-      try {
-        console.log(`Updating NPS score to ${newScore}`);
-        const updateData = new FormData();
-        updateData.append('companyId', companyId);
-        updateData.append('campaignId', campaignId || '');
-        updateData.append('npsScore', newScore.toString());
-        updateData.append('orderId', localOrderId || '');
-        
-        // If we have additional parameters, include them
-        if (Object.keys(additionalParams).length > 0) {
-          updateData.append('additionalParams', JSON.stringify(additionalParams));
-        }
-        
-        // Send to a new API endpoint specifically for updating NPS scores
-        const response = await fetch('/api/update-nps-score', {
-          method: 'POST',
-          body: updateData,
-        });
-        
-        if (!response.ok) {
-          console.error('Failed to update NPS score: Server returned', response.status);
-        }
-      } catch (error) {
-        console.error('Error updating NPS score:', error);
-        // Don't display an error to the user or disrupt the form
+      // If we have additional parameters, include them
+      if (Object.keys(additionalParams).length > 0) {
+        updateData.append('additionalParams', JSON.stringify(additionalParams));
       }
+      
+      // Include client ID if available
       if (clientId) {
         updateData.append('clientId', clientId);
       }
-    };  
+      
+      // Send to a new API endpoint specifically for updating NPS scores
+      const response = await fetch('/api/update-nps-score', {
+        method: 'POST',
+        body: updateData,
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to update NPS score: Server returned', response.status);
+      }
+    } catch (error) {
+      console.error('Error updating NPS score:', error);
+      // Don't display an error to the user or disrupt the form
+    }
+  };  
   
   const handleQuestionResponse = (questionId: string, value: any) => {
     console.log(`Setting response for question ${questionId}:`, value);
@@ -195,10 +193,6 @@ useEffect(() => {
       return;
     }
   
-    if (clientId) {
-      formData.append('clientId', clientId);
-    }    
-
     if (campaignData?.include_additional_questions) {
       const missingRequired = campaignData.questions.some(
         q => q.required && !questionResponses[q.id] && !questionVoiceRecordings[q.id]
@@ -224,16 +218,24 @@ useEffect(() => {
       console.log(`[${clientSubmissionId}] Preparing form data for submission`);
       const formData = new FormData();
       
-      // Handle NPS additional feedback
-      if (campaignData?.include_nps) {
-        if (feedbackType === 'voice' && audioBlob) {
-          console.log(`[${clientSubmissionId}] Adding main audio file: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
-          formData.append('audio', audioBlob);
-        } else if (feedbackType === 'text' && textFeedback) {
-          console.log(`[${clientSubmissionId}] Adding text feedback: ${textFeedback.length} characters`);
-          formData.append('textFeedback', textFeedback);
-        }
-      }  
+      // Add NPS voice feedback to question voice recordings
+      if (campaignData?.include_nps && audioBlob) {
+        console.log(`[${clientSubmissionId}] Adding NPS audio as question voice recording`);
+        // Add the NPS voice feedback to the questionVoiceRecordings
+        const npsQuestionId = 'nps_feedback';
+        formData.append(`question_audio_${npsQuestionId}`, audioBlob);
+        formData.append('hasVoiceQuestions', 'true');
+        
+        // Add NPS question ID to voice question IDs
+        const voiceQuestionIds = [...Object.keys(questionVoiceRecordings), npsQuestionId];
+        formData.append('voiceQuestionIds', JSON.stringify(voiceQuestionIds));
+      } else if (campaignData?.include_nps && textFeedback) {
+        // Handle text feedback as a question response instead
+        const npsQuestionId = 'nps_feedback';
+        const textResponses = {...questionResponses};
+        textResponses[npsQuestionId] = textFeedback;
+        formData.append('questionResponses', JSON.stringify(textResponses));
+      }
       
       // Explicitly log the order ID we're adding to the form
       console.log('Adding orderId to form:', localOrderId);
@@ -246,18 +248,24 @@ useEffect(() => {
       if (campaignData?.include_nps && npsScore) {
         formData.append('npsScore', npsScore.toString());
       }
-    
-      // Add text question responses
-      const textResponses: Record<string, any> = {};
-      Object.entries(questionResponses).forEach(([questionId, value]) => {
-        textResponses[questionId] = value;
-      });
       
-      // Add info about voice recordings for questions
+      if (clientId) {
+        formData.append('clientId', clientId);
+      }
+    
+      // Add voice recordings for additional questions
       const voiceQuestionIds = Object.keys(questionVoiceRecordings);
       if (voiceQuestionIds.length > 0) {
-        formData.append('hasVoiceQuestions', 'true');
-        formData.append('voiceQuestionIds', JSON.stringify(voiceQuestionIds));
+        // Only append if not already set from NPS feedback
+        if (!formData.get('hasVoiceQuestions')) {
+          formData.append('hasVoiceQuestions', 'true');
+          formData.append('voiceQuestionIds', JSON.stringify(voiceQuestionIds));
+        } else {
+          // If we already have voice questions from NPS, merge the IDs
+          const existingIds = JSON.parse(formData.get('voiceQuestionIds') as string);
+          const allIds = [...new Set([...existingIds, ...voiceQuestionIds])];
+          formData.set('voiceQuestionIds', JSON.stringify(allIds));
+        }
         
         // Append each voice recording with a unique key
         voiceQuestionIds.forEach(questionId => {
@@ -268,6 +276,12 @@ useEffect(() => {
         });
       }
     
+      // Add text question responses without NPS feedback text (if already included)
+      const textResponses: Record<string, any> = {};
+      Object.entries(questionResponses).forEach(([questionId, value]) => {
+        textResponses[questionId] = value;
+      });
+      
       // Log question responses before submission
       console.log('Text responses before submission:', textResponses);
       
@@ -357,187 +371,135 @@ useEffect(() => {
       </h1>
 
       {campaignData?.introText && (
-  <div className="mb-8">
-    <div 
-      className="font-manrope text-gray-700 rich-text-content"
-      dangerouslySetInnerHTML={{ __html: campaignData.introText }}
-    />
-  </div>
-)}
+        <div className="mb-8">
+          <div 
+            className="font-manrope text-gray-700 rich-text-content"
+            dangerouslySetInnerHTML={{ __html: campaignData.introText }}
+          />
+        </div>
+      )}
 
-{campaignData?.include_nps && (
-  <div className="mb-8">
-    <div 
-      className="font-manrope text-gray-700 mb-4 rich-text-content"
-      dangerouslySetInnerHTML={{ __html: campaignData.nps_question || t('form.npsQuestion') }}
-    />
-    <div className="flex justify-between gap-2 mb-2">
-      {[...Array(11)].map((_, i) => {
-        const score = i;
-        return (
-          <button
-            key={score}
-            type="button"
-            onClick={() => updateNpsScore(score)}
-            className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
-              ${getScoreColor(score)}`}
-          >
-            {score}
-          </button>
-        );
-      })}
-    </div>
-    <div className="flex justify-between mt-2">
-      <span className="text-sm text-gray-500 font-manrope">{t('form.notLikely')}</span>
-      <span className="text-sm text-gray-500 font-manrope">{t('form.veryLikely')}</span>
-    </div>
-  </div>
-)}
-
+      {campaignData?.include_nps && (
+        <div className="mb-8">
+          <div 
+            className="font-manrope text-gray-700 mb-4 rich-text-content"
+            dangerouslySetInnerHTML={{ __html: campaignData.nps_question || t('form.npsQuestion') }}
+          />
+          <div className="flex justify-between gap-2 mb-2">
+            {[...Array(11)].map((_, i) => {
+              const score = i;
+              return (
+                <button
+                  key={score}
+                  type="button"
+                  onClick={() => updateNpsScore(score)}
+                  className={`w-12 h-12 rounded-lg font-manrope font-semibold transition-all duration-200 
+                    ${getScoreColor(score)}`}
+                >
+                  {score}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex justify-between mt-2">
+            <span className="text-sm text-gray-500 font-manrope">{t('form.notLikely')}</span>
+            <span className="text-sm text-gray-500 font-manrope">{t('form.veryLikely')}</span>
+          </div>
+        </div>
+      )}
 
       {/* Additional Questions Section */}
       {campaignData?.include_additional_questions && campaignData.questions && campaignData.questions.length > 0 && (
-  <div className="space-y-6 mb-8">
-    {campaignData.questions.map((question: CampaignQuestion) => (
-      <div key={question.id} className="space-y-2">
-        <div className="block font-manrope text-gray-700 rich-text-content">
-          <div dangerouslySetInnerHTML={{ __html: question.formattedText || question.text }} />
-          {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
-          {!question.required && (
-            <div className="text-sm text-gray-400 mt-1">
-              {t('form.optional')}
+        <div className="space-y-6 mb-8">
+          {campaignData.questions.map((question: CampaignQuestion) => (
+            <div key={question.id} className="space-y-2">
+              <div className="block font-manrope text-gray-700 rich-text-content">
+                <div dangerouslySetInnerHTML={{ __html: question.formattedText || question.text }} />
+                {question.required && <span className="text-red-500 ml-1 inline-block">*</span>}
+                {!question.required && (
+                  <div className="text-sm text-gray-400 mt-1">
+                    {t('form.optional')}
+                  </div>
+                )}
+              </div>
+              
+              {question.type === 'text' && (
+                <TextQuestion
+                  question={{...question, language}}
+                  value={questionResponses[question.id] || ''}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+
+              {question.type === 'rating' && (
+                <RatingQuestion
+                  question={{...question, language}}
+                  value={questionResponses[question.id] || null}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+
+              {question.type === 'multiple_choice' && (
+                <MultipleChoiceQuestion
+                  question={{...question, language}}
+                  value={questionResponses[question.id] || ''}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+
+              {question.type === 'yes_no' && (
+                <YesNoQuestion
+                  question={{...question, language}}
+                  value={questionResponses[question.id] || ''}
+                  onChange={(value) => handleQuestionResponse(question.id, value)}
+                />
+              )}
+
+              {question.type === 'voice_text' && (
+                <VoiceTextQuestion
+                  question={question}
+                  textValue={questionResponses[question.id] || ''}
+                  onTextChange={(value) => handleQuestionResponse(question.id, value)}
+                  onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
+                  companyColor={companyData?.primary_color || '#657567'}
+                  language={language}
+                  enableGamification={isGamificationEnabled}
+                />
+              )}
             </div>
-          )}
+          ))}
         </div>
-        
-        {question.type === 'text' && (
-  <TextQuestion
-    question={{...question, language}}
-    value={questionResponses[question.id] || ''}
-    onChange={(value) => handleQuestionResponse(question.id, value)}
-  />
-)}
+      )}
 
-{question.type === 'rating' && (
-  <RatingQuestion
-    question={{...question, language}}
-    value={questionResponses[question.id] || null}
-    onChange={(value) => handleQuestionResponse(question.id, value)}
-  />
-)}
-
-{question.type === 'multiple_choice' && (
-  <MultipleChoiceQuestion
-    question={{...question, language}}
-    value={questionResponses[question.id] || ''}
-    onChange={(value) => handleQuestionResponse(question.id, value)}
-  />
-)}
-
-{question.type === 'yes_no' && (
-  <YesNoQuestion
-    question={{...question, language}}
-    value={questionResponses[question.id] || ''}
-    onChange={(value) => handleQuestionResponse(question.id, value)}
-  />
-)}
-
-        {question.type === 'voice_text' && (
+      {/* Voice/Text Feedback Section - Only shown if NPS is included */}
+      {campaignData?.include_nps && (
+        <div className="space-y-4 mb-8">
+          <p className="font-manrope text-gray-700">
+            {/* Use the custom text if available, or fall back to translation */}
+            {campaignData.additionalFeedbackText ? (
+              <div dangerouslySetInnerHTML={{ __html: campaignData.additionalFeedbackText }} />
+            ) : (
+              t('form.additionalFeedback')
+            )}
+          </p>
+          
+          {/* New VoiceTextQuestion component for NPS feedback */}
           <VoiceTextQuestion
-            question={question}
-            textValue={questionResponses[question.id] || ''}
-            onTextChange={(value) => handleQuestionResponse(question.id, value)}
-            onVoiceRecording={(blob) => handleQuestionVoiceRecording(question.id, blob)}
+            question={{
+              id: 'nps_feedback',
+              type: 'voice_text',
+              text: campaignData.additionalFeedbackText || t('form.additionalFeedback'),
+              allowVoice: campaignData.settings.allowVoice,
+              allowText: campaignData.settings.allowText,
+              required: false
+            }}
+            textValue={textFeedback}
+            onTextChange={setTextFeedback}
+            onVoiceRecording={setAudioBlob}
             companyColor={companyData?.primary_color || '#657567'}
             language={language}
             enableGamification={isGamificationEnabled}
           />
-        )}
-      </div>
-    ))}
-  </div>
-)}
-
-      {/* Voice/Text Feedback Section - Only shown if NPS is included */}
-      {campaignData?.include_nps && (
-  <div className="space-y-4 mb-8">
-    <p className="font-manrope text-gray-700">
-      {/* Use the custom text if available, or fall back to translation */}
-      {campaignData.additionalFeedbackText ? (
-        <div dangerouslySetInnerHTML={{ __html: campaignData.additionalFeedbackText }} />
-      ) : (
-        t('form.additionalFeedback')
-      )}
-    </p>
-          
-          {campaignData?.settings.allowVoice && campaignData?.settings.allowText && (
-            <div className="flex justify-center space-x-4 mb-6">
-              <button
-                onClick={() => setFeedbackType('voice')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
-                style={{
-                  backgroundColor: feedbackType === 'voice' ? companyData?.primary_color || '#657567' : 'transparent',
-                  color: feedbackType === 'voice' ? 'white' : companyData?.primary_color || '#657567',
-                  borderWidth: '2px',
-                  borderStyle: 'solid',
-                  borderColor: companyData?.primary_color || '#657567'
-                }}
-              >
-                <Mic className="w-5 h-5" />
-                {t('form.voiceFeedback')}
-              </button>
-              <button
-                onClick={() => setFeedbackType('text')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200`}
-                style={{
-                  backgroundColor: feedbackType === 'text' ? companyData?.primary_color || '#657567' : 'transparent',
-                  color: feedbackType === 'text' ? 'white' : companyData?.primary_color || '#657567',
-                  borderWidth: '2px',
-                  borderStyle: 'solid',
-                  borderColor: companyData?.primary_color || '#657567'
-                }}
-              >
-                <MessageSquare className="w-5 h-5" />
-                {t('form.textFeedback')}
-              </button>
-            </div>
-          )}
-
-        {feedbackType === 'voice' && campaignData?.settings.allowVoice ? (
-          <div>
-            <p className="text-gray-600 mb-4 font-manrope">
-              {t('form.recordLabel')}
-            </p>
-            <AudioRecorder 
-              onRecordingComplete={setAudioBlob}
-              ref={audioRecorderRef}
-              companyColor={companyData?.primary_color || '#657567'}
-              language={language}
-              enableGamification={isGamificationEnabled}
-            />
-          </div>
-        ) : campaignData?.settings.allowText ? (
-          <div>
-            <textarea
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-32 focus:outline-none"
-              value={textFeedback}
-              onChange={(e) => setTextFeedback(e.target.value)}
-              placeholder={t('form.textareaPlaceholder')}
-              style={{
-                borderColor: 'rgb(209, 213, 219)'
-              }}
-              onFocus={(e) => {
-                const color = companyData?.primary_color || '#657567';
-                e.target.style.borderColor = color;
-                e.target.style.boxShadow = `0 0 0 2px ${color}33`;
-              }}
-              onBlur={(e) => {
-                e.target.style.boxShadow = 'none';
-                e.target.style.borderColor = 'rgb(209, 213, 219)';
-              }}
-            />
-          </div>
-        ) : null}
         </div>
       )}
 
@@ -557,7 +519,7 @@ useEffect(() => {
           <span className="text-sm text-gray-600 font-manrope">
             {t('form.consentText', { 
               companyName: companyData?.name || t('form.theCompany'),
-              voiceConsent: (feedbackType === 'voice' || Object.keys(questionVoiceRecordings).length > 0) 
+              voiceConsent: (audioBlob || Object.keys(questionVoiceRecordings).length > 0) 
                 ? t('form.andVoiceRecording') 
                 : ''
             })}{' '}

@@ -37,17 +37,9 @@ export async function POST(request: NextRequest) {
     const npsScore = formData.get('npsScore') ? parseInt(formData.get('npsScore') as string) : null;
     const companyId = formData.get('companyId') as string;
     const campaignId = formData.get('campaignId') as string;
-    const audioFile = formData.get('audio') as Blob | null;
     const textFeedback = formData.get('textFeedback') as string | null;
     const questionResponsesStr = formData.get('questionResponses') as string | null;
     const clientId = formData.get('clientId') as string;
-    
-    // New logging for audio availability
-    if (audioFile) {
-      console.log(`[${submissionAttemptId}] Main audio file detected: ${audioFile.size} bytes, type: ${audioFile.type}`);
-    } else {
-      console.log(`[${submissionAttemptId}] No main audio file in submission`);
-    }
     
     // New fields for question voice recordings
     const hasVoiceQuestions = formData.get('hasVoiceQuestions') === 'true';
@@ -94,7 +86,6 @@ export async function POST(request: NextRequest) {
       npsScore, 
       companyId, 
       campaignId, 
-      hasAudio: !!audioFile,
       hasText: !!textFeedback,
       hasQuestionResponses: !!questionResponses,
       hasVoiceQuestions,
@@ -131,41 +122,20 @@ export async function POST(request: NextRequest) {
     let transcription = null;
     let sentiment = null;
 
-    // Process main audio feedback (related to NPS)
-    if (audioFile) {
+    // Check if we have NPS text feedback from the question responses
+    if (questionResponses && questionResponses['nps_feedback']) {
+      transcription = questionResponses['nps_feedback'];
       try {
-        console.log(`[${submissionAttemptId}] Processing main audio file...`);
-        console.log(`[${submissionAttemptId}] Audio file type: ${audioFile.type}, size: ${audioFile.size} bytes`);
-        const arrayBuffer = await audioFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        console.log(`[${submissionAttemptId}] Successfully converted audio to buffer, size: ${buffer.length} bytes`);
-    
-        console.log(`[${submissionAttemptId}] Uploading to S3...`);
-        voiceFileUrl = await uploadVoiceRecording(buffer, `${companyId}/${campaignId}/${orderId || 'no-order-id'}`);
-        console.log(`[${submissionAttemptId}] S3 upload complete:`, voiceFileUrl);
-    
-        console.log(`[${submissionAttemptId}] Transcribing audio...`);
-        transcription = await transcribeAudio(buffer);
-        console.log(`[${submissionAttemptId}] Transcription complete:`, transcription ? transcription.substring(0, 100) + '...' : 'No transcription');
-    
-        if (transcription) {
-          console.log(`[${submissionAttemptId}] Analyzing feedback...`);
-          const analysis = await analyzeFeedback(transcription);
-          sentiment = analysis.sentiment;
-          console.log(`[${submissionAttemptId}] Analysis complete:`, sentiment);
-        }
+        console.log('Analyzing NPS text feedback...');
+        const analysis = await analyzeFeedback(transcription);
+        sentiment = analysis.sentiment;
+        console.log('Analysis complete:', sentiment);
       } catch (error) {
-        console.error(`[${submissionAttemptId}] Error processing audio:`, error);
-        // Log more details about the error
-        if (error instanceof Error) {
-          console.error(`[${submissionAttemptId}] Error name: ${error.name}, message: ${error.message}`);
-          console.error(`[${submissionAttemptId}] Error stack:`, error.stack);
-        }
-        return NextResponse.json(
-          { error: 'Failed to process audio', details: error instanceof Error ? error.message : String(error) },
-          { status: 500 }
-        );
+        console.error('Error analyzing text:', error);
       }
+      
+      // Remove from question responses since we're handling it separately
+      delete questionResponses['nps_feedback'];
     }
     else if (textFeedback) {
       transcription = textFeedback;
@@ -210,263 +180,262 @@ export async function POST(request: NextRequest) {
     const submissionId = generateUniqueSubmissionId(submissionData);
     console.log('Generated submission ID:', submissionId);
     
-    // Check for existing submission with this unique ID
-    const { data: existingSubmission, error: queryError } = await serviceRoleClient
-      .from('feedback_submissions')
-      .select('id, metadata, created_at')
-      .eq('submission_identifier', submissionId)
-      .maybeSingle();
-    
-    if (queryError) {
-      console.error('Error querying existing submissions:', queryError);
-    }
-    
-    // Prepare the feedback data
-    const feedbackData = {
-      company_id: companyId,
-      campaign_id: campaignId,
-      order_id: orderIdToSave,
-      nps_score: finalNpsScore,
-      voice_file_url: voiceFileUrl,
-      transcription,
-      sentiment,
-      processed: false,
-      metadata: metadata,
-      submission_identifier: submissionId,  // Store the unique identifier
-      browser_client_id: clientId || null
-    };
-    
-    let feedback;
-    let feedbackError;
-    
-    // Use the existing submission if found, otherwise create a new one
-    if (existingSubmission) {
-      console.log(`Updating existing submission: ${existingSubmission.id}`);
-      
-      // Update the existing submission with new data
-      const { data, error } = await serviceRoleClient
-        .from('feedback_submissions')
-        .update(feedbackData)
-        .eq('id', existingSubmission.id)
-        .select()
-        .single();
-        
-      feedback = data;
-      feedbackError = error;
-      
-      if (error) {
-        console.error('Error updating existing submission:', error);
-      } else {
-        console.log('Successfully updated existing submission:', data);
-      }
-    } else {
-      console.log('Creating new submission');
-      
-      // Create a new feedback submission
-      const { data, error } = await serviceRoleClient
-        .from('feedback_submissions')
-        .insert(feedbackData)
-        .select()
-        .single();
-        
-      feedback = data;
-      feedbackError = error;
-      
-      if (error) {
-        console.error('Error creating new submission:', error);
-      } else {
-        console.log('Successfully created new submission:', data);
-      }
-    }
+// Check for existing submission with this unique ID
+const { data: existingSubmission, error: queryError } = await serviceRoleClient
+.from('feedback_submissions')
+.select('id, metadata, created_at')
+.eq('submission_identifier', submissionId)
+.maybeSingle();
 
-    if (feedbackError) {
-      console.error('Database error saving feedback:', feedbackError);
-      return NextResponse.json(
-        { error: 'Failed to save feedback' },
-        { status: 500 }
-      );
-    }
+if (queryError) {
+console.error('Error querying existing submissions:', queryError);
+}
 
-    console.log('Feedback saved successfully:', feedback);
+// Prepare the feedback data
+const feedbackData = {
+company_id: companyId,
+campaign_id: campaignId,
+order_id: orderIdToSave,
+nps_score: finalNpsScore,
+voice_file_url: voiceFileUrl,
+transcription,
+sentiment,
+processed: false,
+metadata: metadata,
+submission_identifier: submissionId,  // Store the unique identifier
+browser_client_id: clientId || null
+};
 
-    // Process question voice recordings - MODIFIED for longer recordings
-    const questionVoiceFiles: Record<string, string> = {};
+let feedback;
+let feedbackError;
+
+// Use the existing submission if found, otherwise create a new one
+if (existingSubmission) {
+console.log(`Updating existing submission: ${existingSubmission.id}`);
+
+// Update the existing submission with new data
+const { data, error } = await serviceRoleClient
+  .from('feedback_submissions')
+  .update(feedbackData)
+  .eq('id', existingSubmission.id)
+  .select()
+  .single();
+  
+feedback = data;
+feedbackError = error;
+
+if (error) {
+  console.error('Error updating existing submission:', error);
+} else {
+  console.log('Successfully updated existing submission:', data);
+}
+} else {
+console.log('Creating new submission');
+
+// Create a new feedback submission
+const { data, error } = await serviceRoleClient
+  .from('feedback_submissions')
+  .insert(feedbackData)
+  .select()
+  .single();
+  
+feedback = data;
+feedbackError = error;
+
+if (error) {
+  console.error('Error creating new submission:', error);
+} else {
+  console.log('Successfully created new submission:', data);
+}
+}
+
+if (feedbackError) {
+console.error('Database error saving feedback:', feedbackError);
+return NextResponse.json(
+  { error: 'Failed to save feedback' },
+  { status: 500 }
+);
+}
+
+console.log('Feedback saved successfully:', feedback);
+
+// Process question voice recordings - MODIFIED for longer recordings
+const questionVoiceFiles: Record<string, string> = {};
 const pendingVoiceTranscriptions: string[] = [];
 
 if (hasVoiceQuestions && voiceQuestionIds.length > 0) {
-  console.log(`[${submissionAttemptId}] Processing voice recordings for ${voiceQuestionIds.length} questions...`);
+console.log(`[${submissionAttemptId}] Processing voice recordings for ${voiceQuestionIds.length} questions...`);
+
+for (const questionId of voiceQuestionIds) {
+  const questionAudioFile = formData.get(`question_audio_${questionId}`) as Blob | null;
   
-  for (const questionId of voiceQuestionIds) {
-    const questionAudioFile = formData.get(`question_audio_${questionId}`) as Blob | null;
-    
-    if (questionAudioFile) {
-      try {
-        console.log(`[${submissionAttemptId}] Processing audio for question ${questionId}...`);
-        console.log(`[${submissionAttemptId}] Question audio file type: ${questionAudioFile.type}, size: ${questionAudioFile.size} bytes`);
-        const arrayBuffer = await questionAudioFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        console.log(`[${submissionAttemptId}] Successfully converted question audio to buffer, size: ${buffer.length} bytes`);
-        
-        // Upload to S3 with a distinct path
-        const filePath = await uploadVoiceRecording(
-          buffer, 
-          `${companyId}/${campaignId}/question_${questionId}_${orderId || 'no-order-id'}`
-        );
-        questionVoiceFiles[questionId] = filePath;
-        
-        // Store file path and mark for async transcription
-        pendingVoiceTranscriptions.push(questionId);
-        
-        console.log(`[${submissionAttemptId}] Uploaded audio for question ${questionId}, filePath: ${filePath}`);
-      } catch (error) {
-        console.error(`[${submissionAttemptId}] Error processing audio for question ${questionId}:`, error);
-        // Log more details about the error
-        if (error instanceof Error) {
-          console.error(`[${submissionAttemptId}] Error name: ${error.name}, message: ${error.message}`);
-          console.error(`[${submissionAttemptId}] Error stack:`, error.stack);
-        }
-        // Continue with other questions rather than failing the entire submission
+  if (questionAudioFile) {
+    try {
+      console.log(`[${submissionAttemptId}] Processing audio for question ${questionId}...`);
+      console.log(`[${submissionAttemptId}] Question audio file type: ${questionAudioFile.type}, size: ${questionAudioFile.size} bytes`);
+      const arrayBuffer = await questionAudioFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      console.log(`[${submissionAttemptId}] Successfully converted question audio to buffer, size: ${buffer.length} bytes`);
+      
+      // Upload to S3 with a distinct path
+      const filePath = await uploadVoiceRecording(
+        buffer, 
+        `${companyId}/${campaignId}/question_${questionId}_${orderId || 'no-order-id'}`
+      );
+      questionVoiceFiles[questionId] = filePath;
+      
+      // Store file path and mark for async transcription
+      pendingVoiceTranscriptions.push(questionId);
+      
+      console.log(`[${submissionAttemptId}] Uploaded audio for question ${questionId}, filePath: ${filePath}`);
+    } catch (error) {
+      console.error(`[${submissionAttemptId}] Error processing audio for question ${questionId}:`, error);
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error(`[${submissionAttemptId}] Error name: ${error.name}, message: ${error.message}`);
+        console.error(`[${submissionAttemptId}] Error stack:`, error.stack);
       }
-    } else {
-      console.log(`[${submissionAttemptId}] No audio file found for question ${questionId}`);
+      // Continue with other questions rather than failing the entire submission
     }
+  } else {
+    console.log(`[${submissionAttemptId}] No audio file found for question ${questionId}`);
   }
+}
 } else {
-  console.log(`[${submissionAttemptId}] No voice questions to process`);
+console.log(`[${submissionAttemptId}] No voice questions to process`);
 }
 
+// Save question responses - MODIFIED for pending transcriptions
+if ((questionResponses || Object.keys(questionVoiceFiles).length > 0) && feedback) {
+console.log('About to save question responses. Feedback ID:', feedback.id);
 
-    // Save question responses - MODIFIED for pending transcriptions
-    if ((questionResponses || Object.keys(questionVoiceFiles).length > 0) && feedback) {
-      console.log('About to save question responses. Feedback ID:', feedback.id);
-      
-      // If we're updating an existing submission, first delete any existing responses
-      if (existingSubmission) {
-        console.log('Deleting existing question responses for submission:', feedback.id);
-        const { error: deleteError } = await serviceRoleClient
-          .from('question_responses')
-          .delete()
-          .eq('feedback_submission_id', feedback.id);
-          
-        if (deleteError) {
-          console.error('Error deleting existing question responses:', deleteError);
-        } else {
-          console.log('Successfully deleted existing question responses');
-        }
-      }
-      
-      // Format text responses for insertion
-      const questionResponsesArray = [];
-      
-      // Add text responses
-      if (questionResponses) {
-        for (const [questionId, value] of Object.entries(questionResponses)) {
-          questionResponsesArray.push({
-            feedback_submission_id: feedback.id,
-            question_id: questionId,
-            response_value: typeof value === 'string' ? value : JSON.stringify(value),
-            voice_file_url: questionVoiceFiles[questionId] || null,
-            transcription: null,  // Will be updated asynchronously
-            transcription_status: questionVoiceFiles[questionId] ? 'pending' : null
-          });
-        }
-      }
-      
-      // Add voice-only responses (if not already in text responses)
-      for (const questionId of Object.keys(questionVoiceFiles)) {
-        if (!questionResponses || !questionResponses[questionId]) {
-          questionResponsesArray.push({
-            feedback_submission_id: feedback.id,
-            question_id: questionId,
-            response_value: null, // No text response
-            voice_file_url: questionVoiceFiles[questionId] || null,
-            transcription: null, // Will be updated asynchronously
-            transcription_status: 'pending'
-          });
-        }
-      }
-
-      console.log('Formatted responses for insertion:', questionResponsesArray);
-
-      if (questionResponsesArray.length > 0) {
-        // Attempt to save responses - using service role client
-        const { data: savedResponses, error: responsesError } = await serviceRoleClient
-          .from('question_responses')
-          .insert(questionResponsesArray)
-          .select();
-
-        if (responsesError) {
-          console.error('Failed to save question responses:', responsesError);
-        } else {
-          console.log('Successfully saved responses:', savedResponses);
-        }
-      }
-    } else {
-      console.log('No question responses to save or no feedback ID available');
-    }
-
-    // Trigger transcription job asynchronously if needed
-    if (pendingVoiceTranscriptions.length > 0) {
-      try {
-        console.log('Triggering async transcription for question voice recordings');
-        
-        // Create a direct call to the service role client instead of using fetch
-        // This avoids the socket error issue with the fetch API in serverless functions
-        const { error: transcriptionError } = await serviceRoleClient
-          .from('question_responses')
-          .update({ 
-            transcription_status: 'pending_retry' 
-          })
-          .eq('feedback_submission_id', feedback.id)
-          .in('question_id', pendingVoiceTranscriptions);
-        
-        if (transcriptionError) {
-          console.error('Error marking questions for transcription:', transcriptionError);
-        } else {
-          console.log('Successfully marked questions for transcription');
-          
-          // Use a more reliable method to trigger the transcription
-          // This avoids network requests within the same serverless function
-          try {
-            // Try to trigger directly if possible
-            const directResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/process-transcriptions`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                feedbackId: feedback.id,
-                questionIds: pendingVoiceTranscriptions
-              }),
-              // Add timeout to prevent hanging
-              signal: AbortSignal.timeout(2000) // 2-second timeout
-            });
-            
-            console.log('Direct transcription response status:', directResponse.status);
-          } catch (fetchError) {
-            // If direct trigger fails, that's okay - we've already marked the records
-            console.log('Direct transcription trigger failed, will be processed by background job');
-            console.error('Fetch error details:', fetchError);
-          }
-        }
-      } catch (error) {
-        console.error('Error starting transcription process:', error);
-        // This is not critical - transcriptions will be retried later
-      }
-    }    
-
-    console.log('Feedback submission process complete');
-    return NextResponse.json({ 
-      success: true,
-      feedback,
-      hasQuestionResponses: !!questionResponses || Object.keys(questionVoiceFiles).length > 0,
-      transcriptionsInProgress: pendingVoiceTranscriptions.length > 0
-    });
-  } catch (error) {
-    console.error('Error processing feedback:', error);
-    return NextResponse.json(
-      { error: 'Failed to process feedback' },
-      { status: 500 }
-    );
+// If we're updating an existing submission, first delete any existing responses
+if (existingSubmission) {
+  console.log('Deleting existing question responses for submission:', feedback.id);
+  const { error: deleteError } = await serviceRoleClient
+    .from('question_responses')
+    .delete()
+    .eq('feedback_submission_id', feedback.id);
+    
+  if (deleteError) {
+    console.error('Error deleting existing question responses:', deleteError);
+  } else {
+    console.log('Successfully deleted existing question responses');
   }
+}
+
+// Format text responses for insertion
+const questionResponsesArray = [];
+
+// Add text responses
+if (questionResponses) {
+  for (const [questionId, value] of Object.entries(questionResponses)) {
+    questionResponsesArray.push({
+      feedback_submission_id: feedback.id,
+      question_id: questionId,
+      response_value: typeof value === 'string' ? value : JSON.stringify(value),
+      voice_file_url: questionVoiceFiles[questionId] || null,
+      transcription: null,  // Will be updated asynchronously
+      transcription_status: questionVoiceFiles[questionId] ? 'pending' : null
+    });
+  }
+}
+
+// Add voice-only responses (if not already in text responses)
+for (const questionId of Object.keys(questionVoiceFiles)) {
+  if (!questionResponses || !questionResponses[questionId]) {
+    questionResponsesArray.push({
+      feedback_submission_id: feedback.id,
+      question_id: questionId,
+      response_value: null, // No text response
+      voice_file_url: questionVoiceFiles[questionId] || null,
+      transcription: null, // Will be updated asynchronously
+      transcription_status: 'pending'
+    });
+  }
+}
+
+console.log('Formatted responses for insertion:', questionResponsesArray);
+
+if (questionResponsesArray.length > 0) {
+  // Attempt to save responses - using service role client
+  const { data: savedResponses, error: responsesError } = await serviceRoleClient
+    .from('question_responses')
+    .insert(questionResponsesArray)
+    .select();
+
+  if (responsesError) {
+    console.error('Failed to save question responses:', responsesError);
+  } else {
+    console.log('Successfully saved responses:', savedResponses);
+  }
+}
+} else {
+console.log('No question responses to save or no feedback ID available');
+}
+
+// Trigger transcription job asynchronously if needed
+if (pendingVoiceTranscriptions.length > 0) {
+try {
+  console.log('Triggering async transcription for question voice recordings');
+  
+  // Create a direct call to the service role client instead of using fetch
+  // This avoids the socket error issue with the fetch API in serverless functions
+  const { error: transcriptionError } = await serviceRoleClient
+    .from('question_responses')
+    .update({ 
+      transcription_status: 'pending_retry' 
+    })
+    .eq('feedback_submission_id', feedback.id)
+    .in('question_id', pendingVoiceTranscriptions);
+  
+  if (transcriptionError) {
+    console.error('Error marking questions for transcription:', transcriptionError);
+  } else {
+    console.log('Successfully marked questions for transcription');
+    
+    // Use a more reliable method to trigger the transcription
+    // This avoids network requests within the same serverless function
+    try {
+      // Try to trigger directly if possible
+      const directResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/process-transcriptions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          feedbackId: feedback.id,
+          questionIds: pendingVoiceTranscriptions
+        }),
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(2000) // 2-second timeout
+      });
+      
+      console.log('Direct transcription response status:', directResponse.status);
+    } catch (fetchError) {
+      // If direct trigger fails, that's okay - we've already marked the records
+      console.log('Direct transcription trigger failed, will be processed by background job');
+      console.error('Fetch error details:', fetchError);
+    }
+  }
+} catch (error) {
+  console.error('Error starting transcription process:', error);
+  // This is not critical - transcriptions will be retried later
+}
+}    
+
+console.log('Feedback submission process complete');
+return NextResponse.json({ 
+success: true,
+feedback,
+hasQuestionResponses: !!questionResponses || Object.keys(questionVoiceFiles).length > 0,
+transcriptionsInProgress: pendingVoiceTranscriptions.length > 0
+});
+} catch (error) {
+console.error('Error processing feedback:', error);
+return NextResponse.json(
+{ error: 'Failed to process feedback' },
+{ status: 500 }
+);
+}
 }
