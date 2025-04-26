@@ -217,26 +217,34 @@ export default function FeedbackForm({
   
       console.log(`[${clientSubmissionId}] Preparing form data for submission`);
       const formData = new FormData();
-      
-      // Add NPS voice feedback to question voice recordings
-      if (campaignData?.include_nps && audioBlob) {
-        console.log(`[${clientSubmissionId}] Adding NPS audio as question voice recording`);
-        // Add the NPS voice feedback to the questionVoiceRecordings
-        const npsQuestionId = 'nps_feedback';
-        formData.append(`question_audio_${npsQuestionId}`, audioBlob);
-        formData.append('hasVoiceQuestions', 'true');
-        
-        // Add NPS question ID to voice question IDs
-        const voiceQuestionIds = [...Object.keys(questionVoiceRecordings), npsQuestionId];
-        formData.append('voiceQuestionIds', JSON.stringify(voiceQuestionIds));
-      } else if (campaignData?.include_nps && textFeedback) {
-        // Handle text feedback as a question response instead
-        const npsQuestionId = 'nps_feedback';
+    
+      // Add NPS score as a question response
+      if (campaignData?.include_nps && npsScore !== null) {
+        // Create or update the text responses with NPS score
         const textResponses = {...questionResponses};
-        textResponses[npsQuestionId] = textFeedback;
+        textResponses['nps_score'] = npsScore.toString();
+        
+        // Add NPS voice feedback to question voice recordings
+        if (audioBlob) {
+          console.log(`[${clientSubmissionId}] Adding NPS audio as question voice recording`);
+          const npsQuestionId = 'nps_feedback';
+          formData.append(`question_audio_${npsQuestionId}`, audioBlob);
+          formData.append('hasVoiceQuestions', 'true');
+          
+          // Add NPS question ID to voice question IDs
+          const voiceQuestionIds = [...Object.keys(questionVoiceRecordings), npsQuestionId];
+          formData.append('voiceQuestionIds', JSON.stringify(voiceQuestionIds));
+        }
+        
+        // Add NPS text feedback if available
+        if (textFeedback) {
+          textResponses['nps_feedback'] = textFeedback;
+        }
+        
+        // Update the form data with all text responses
         formData.append('questionResponses', JSON.stringify(textResponses));
       }
-      
+        
       // Explicitly log the order ID we're adding to the form
       console.log('Adding orderId to form:', localOrderId);
       formData.append('orderId', localOrderId || '');

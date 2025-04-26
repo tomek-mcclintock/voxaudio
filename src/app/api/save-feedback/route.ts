@@ -75,6 +75,13 @@ export async function POST(request: NextRequest) {
       try {
         questionResponses = JSON.parse(questionResponsesStr);
         console.log(`[${submissionAttemptId}] Parsed questionResponses:`, questionResponses);
+        // Extract NPS score if provided as a question response
+        const npsScoreFromResponses = questionResponses['nps_score'];
+
+        // For backward compatibility, also use the form field if provided
+        if (npsScore !== null && !npsScoreFromResponses) {
+          questionResponses['nps_score'] = npsScore.toString();
+        }
       } catch (e) {
         console.error(`[${submissionAttemptId}] Failed to parse questionResponses:`, e);
         console.error(`[${submissionAttemptId}] Parse error details:`, e);
@@ -196,9 +203,9 @@ const feedbackData = {
 company_id: companyId,
 campaign_id: campaignId,
 order_id: orderIdToSave,
-nps_score: finalNpsScore,
-voice_file_url: voiceFileUrl,
-transcription,
+// nps_score: finalNpsScore,
+// voice_file_url: voiceFileUrl,
+// transcription,
 sentiment,
 processed: false,
 metadata: metadata,

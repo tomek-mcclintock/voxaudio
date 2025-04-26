@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       companyId,
       campaignId,
       additionalParams: metadata,
-      clientId // Add this line
+      clientId
     };
     
     const submissionId = generateUniqueSubmissionId(submissionData);
@@ -76,17 +76,46 @@ export async function POST(request: NextRequest) {
     if (existingSubmission) {
       // Update the existing submission
       console.log(`Updating existing submission with ID: ${existingSubmission.id}`);
+      
+      // For backward compatibility, still update the nps_score field
       const { error: updateError } = await serviceRoleClient
         .from('feedback_submissions')
         .update({ 
           nps_score: npsScore,
-          metadata: metadata  // Update metadata in case structure changed
+          metadata: metadata
         })
         .eq('id', existingSubmission.id);
         
       if (updateError) {
         console.error('Error updating NPS score:', updateError);
         throw updateError;
+      }
+      
+      // Also store as a question response
+      const { data: existingNPS, error: npsCheckError } = await serviceRoleClient
+        .from('question_responses')
+        .select('id')
+        .eq('feedback_submission_id', existingSubmission.id)
+        .eq('question_id', 'nps_score')
+        .maybeSingle();
+        
+      if (npsCheckError) {
+        console.error('Error checking existing NPS response:', npsCheckError);
+      } else if (existingNPS) {
+        // Update existing NPS question response
+        await serviceRoleClient
+          .from('question_responses')
+          .update({ response_value: npsScore.toString() })
+          .eq('id', existingNPS.id);
+      } else {
+        // Create new NPS question response
+        await serviceRoleClient
+          .from('question_responses')
+          .insert([{
+            feedback_submission_id: existingSubmission.id,
+            question_id: 'nps_score',
+            response_value: npsScore.toString()
+          }]);
       }
       
       console.log('NPS score successfully updated for existing submission');
@@ -99,7 +128,7 @@ export async function POST(request: NextRequest) {
           company_id: companyId,
           campaign_id: campaignId,
           order_id: orderId || null,
-          nps_score: npsScore,
+          nps_score: npsScore, // Keep for backward compatibility
           metadata: metadata,
           processed: false,
           submission_identifier: submissionId  // Store the unique identifier
@@ -113,6 +142,17 @@ export async function POST(request: NextRequest) {
       }
       
       console.log('New submission created with ID:', newSubmission?.id);
+      
+      // After creating the submission, add an NPS question response
+      if (newSubmission) {
+        await serviceRoleClient
+          .from('question_responses')
+          .insert([{
+            feedback_submission_id: newSubmission.id,
+            question_id: 'nps_score',
+            response_value: npsScore.toString()
+          }]);
+      }
     }
     
     return NextResponse.json({ success: true });

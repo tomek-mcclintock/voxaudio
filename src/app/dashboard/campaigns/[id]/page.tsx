@@ -156,14 +156,22 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         // Only calculate NPS if the campaign includes NPS questions
         let averageNPS = null;
         if (data.campaign.include_nps) {
+          // Extract NPS scores from question_responses
           const npsScores = data.feedback
-            .filter((f: FeedbackData) => f.nps_score !== null)
-            .map((f: FeedbackData) => f.nps_score);
+            .map((f: FeedbackData) => {
+              // First check for traditional nps_score field (backward compatibility)
+              if (f.nps_score !== null) return f.nps_score;
+              
+              // Then check question_responses for an nps_score entry
+              const npsResponse = f.question_responses?.find(r => r.question_id === 'nps_score');
+              return npsResponse ? parseInt(npsResponse.response_value) : null;
+            })
+            .filter((score: number | null) => score !== null);
           
           // Calculate proper NPS (-100 to 100 scale)
           if (npsScores.length > 0) {
-            const promoters = npsScores.filter((score: number | null) => score !== null && score >= 9).length;
-            const detractors = npsScores.filter((score: number | null) => score !== null && score <= 6).length;
+            const promoters = npsScores.filter((score: number) => score >= 9).length;
+            const detractors = npsScores.filter((score: number) => score <= 6).length;
             const promoterPercentage = (promoters / npsScores.length) * 100;
             const detractorPercentage = (detractors / npsScores.length) * 100;
             averageNPS = promoterPercentage - detractorPercentage;

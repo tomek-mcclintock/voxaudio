@@ -5,6 +5,26 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
+// Define types for our data structures
+interface QuestionResponse {
+  id: string;
+  feedback_submission_id: string;
+  question_id: string;
+  response_value: string | null;
+  transcription: string | null;
+  voice_file_url: string | null;
+  transcription_status: string | null;
+}
+
+interface FeedbackSubmission {
+  created_at: string;
+  order_id: string | null;
+  nps_score: number | null;
+  transcription: string | null;
+  sentiment: string | null;
+  question_responses: QuestionResponse[] | null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -42,7 +62,7 @@ export async function GET(
 
     console.log('Retrieved campaign:', campaign);
 
-    // Get feedback for this campaign
+    // Get feedback for this campaign - without comments in the query string
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedback_submissions')
       .select(`
@@ -62,9 +82,32 @@ export async function GET(
       throw feedbackError;
     }
 
+    // Process feedback to ensure all fields are available regardless of storage location
+    const processedFeedback = (feedback || []).map((item: FeedbackSubmission) => {
+      // Check for NPS score in question_responses
+      const npsScoreResponse = item.question_responses?.find((r: QuestionResponse) => r.question_id === 'nps_score');
+      const npsScore = npsScoreResponse && npsScoreResponse.response_value
+        ? parseInt(npsScoreResponse.response_value) 
+        : item.nps_score; // Fallback to legacy field
+      
+      // Check for NPS feedback text/transcription in question_responses
+      const npsFeedbackResponse = item.question_responses?.find((r: QuestionResponse) => r.question_id === 'nps_feedback');
+      const transcription = 
+        (npsFeedbackResponse?.transcription) || 
+        (npsFeedbackResponse?.response_value) || 
+        item.transcription;
+      
+      // Create a new object with all the original properties plus our updated ones
+      return {
+        ...item,
+        nps_score: npsScore,
+        transcription
+      };
+    });
+
     return NextResponse.json({
       campaign,
-      feedback: feedback || []
+      feedback: processedFeedback
     });
 
   } catch (error) {
