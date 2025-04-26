@@ -109,7 +109,6 @@ export default function FeedbackForm({
     campaignData.settings.enableGamification : true; // Default to true if not specified
 
   const updateNpsScore = async (newScore: number) => {
-    const updateData = new FormData();
     // First update the local state
     setNpsScore(newScore);
     
@@ -168,7 +167,6 @@ export default function FeedbackForm({
   };
   
   const handleSubmit = async () => {
-    const formData = new FormData();
     const clientSubmissionId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     console.log(`[${clientSubmissionId}] Starting client-side submission process with orderID:`, localOrderId);
     console.log(`[${clientSubmissionId}] Client-side questionResponses:`, questionResponses);
@@ -217,17 +215,26 @@ export default function FeedbackForm({
   
       console.log(`[${clientSubmissionId}] Preparing form data for submission`);
       const formData = new FormData();
-    
-      // Add NPS score as a question response
-      if (campaignData?.include_nps && npsScore !== null) {
-        // Create or update the text responses with NPS score
+      
+      // Handle NPS score and feedback as a single question response
+      if (campaignData?.include_nps && (npsScore !== null || textFeedback || audioBlob)) {
+        // Create or update the text responses
         const textResponses = {...questionResponses};
-        textResponses['nps_score'] = npsScore.toString();
         
-        // Add NPS voice feedback to question voice recordings
+        // Add NPS score to question responses
+        if (npsScore !== null) {
+          textResponses['nps_score'] = npsScore.toString();
+        }
+        
+        // Add NPS text feedback to question responses
+        if (textFeedback) {
+          textResponses['nps_feedback'] = textFeedback;
+        }
+        
+        // If we have a voice recording for NPS feedback
         if (audioBlob) {
           console.log(`[${clientSubmissionId}] Adding NPS audio as question voice recording`);
-          const npsQuestionId = 'nps_feedback';
+          const npsQuestionId = 'nps_score'; // Use a single consistent ID
           formData.append(`question_audio_${npsQuestionId}`, audioBlob);
           formData.append('hasVoiceQuestions', 'true');
           
@@ -236,15 +243,10 @@ export default function FeedbackForm({
           formData.append('voiceQuestionIds', JSON.stringify(voiceQuestionIds));
         }
         
-        // Add NPS text feedback if available
-        if (textFeedback) {
-          textResponses['nps_feedback'] = textFeedback;
-        }
-        
         // Update the form data with all text responses
         formData.append('questionResponses', JSON.stringify(textResponses));
       }
-        
+      
       // Explicitly log the order ID we're adding to the form
       console.log('Adding orderId to form:', localOrderId);
       formData.append('orderId', localOrderId || '');
@@ -253,10 +255,8 @@ export default function FeedbackForm({
       if (campaignId) {
         formData.append('campaignId', campaignId);
       }
-      if (campaignData?.include_nps && npsScore) {
-        formData.append('npsScore', npsScore.toString());
-      }
       
+      // Include clientId if available
       if (clientId) {
         formData.append('clientId', clientId);
       }
@@ -274,7 +274,6 @@ export default function FeedbackForm({
           const allIds = [...new Set([...existingIds, ...voiceQuestionIds])];
           formData.set('voiceQuestionIds', JSON.stringify(allIds));
         }
-        
         // Append each voice recording with a unique key
         voiceQuestionIds.forEach(questionId => {
           const blob = questionVoiceRecordings[questionId];
@@ -284,19 +283,14 @@ export default function FeedbackForm({
         });
       }
     
-      // Add text question responses without NPS feedback text (if already included)
-      const textResponses: Record<string, any> = {};
-      Object.entries(questionResponses).forEach(([questionId, value]) => {
-        textResponses[questionId] = value;
-      });
-      
-      // Log question responses before submission
-      console.log('Text responses before submission:', textResponses);
-      
-      if (Object.keys(textResponses).length > 0) {
-        const responsesJson = JSON.stringify(textResponses);
-        console.log('Stringified responses:', responsesJson);
-        formData.append('questionResponses', responsesJson);
+      // Add additional question responses if not already included
+      if (Object.keys(questionResponses).length > 0) {
+        // Check if we already added question responses for NPS
+        if (!formData.has('questionResponses')) {
+          const textResponsesJson = JSON.stringify(questionResponses);
+          console.log('Adding question responses:', textResponsesJson);
+          formData.append('questionResponses', textResponsesJson);
+        }
       }
       
       // Add additional parameters if present
@@ -367,8 +361,6 @@ export default function FeedbackForm({
       return 'bg-green-200 text-green-700 opacity-75';
     }
   };
-
-
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
@@ -494,7 +486,7 @@ export default function FeedbackForm({
           {/* New VoiceTextQuestion component for NPS feedback */}
           <VoiceTextQuestion
             question={{
-              id: 'nps_feedback',
+              id: 'nps_score',
               type: 'voice_text',
               text: campaignData.additionalFeedbackText || t('form.additionalFeedback'),
               allowVoice: campaignData.settings.allowVoice,
