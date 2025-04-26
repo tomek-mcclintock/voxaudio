@@ -106,11 +106,14 @@ export async function POST(request: NextRequest) {
     let query = serviceRoleClient
       .from('question_responses')
       .select('id, question_id, voice_file_url, transcription_status')
-      .eq('feedback_submission_id', feedbackId)
-      .in('question_id', questionIds);
+      .eq('feedback_submission_id', feedbackId);
       
+    // Apply question_id filter if provided
+    if (questionIds && questionIds.length > 0) {
+      query = query.in('question_id', questionIds);
+    } 
     // If not forcing reprocess, only get pending ones
-    if (!forceReprocess) {
+    else if (!forceReprocess) {
       query = query.eq('transcription_status', 'pending');
     }
     
@@ -119,6 +122,16 @@ export async function POST(request: NextRequest) {
     if (fetchError) {
       console.error('Error fetching responses:', fetchError);
       return NextResponse.json({ error: 'Failed to fetch responses' }, { status: 500 });
+    }
+    
+    console.log(`Query results: Found ${responses?.length || 0} responses to process`);
+    if (responses && responses.length > 0) {
+      console.log('Response details:', responses.map(r => ({
+        id: r.id,
+        question_id: r.question_id,
+        status: r.transcription_status,
+        has_file: !!r.voice_file_url
+      })));
     }
     
     if (!responses || responses.length === 0) {
@@ -136,6 +149,9 @@ export async function POST(request: NextRequest) {
           console.log(`No voice file URL for response ${response.id}, skipping`);
           continue;
         }
+        
+        // Log the voice file URL for debugging
+        console.log(`Processing voice file: ${response.voice_file_url}`);
         
         console.log(`Processing transcription for response ${response.id}, file: ${response.voice_file_url}`);
         
