@@ -449,8 +449,8 @@ export async function POST(request: NextRequest) {
           // Use a more reliable method to trigger the transcription
           // This avoids network requests within the same serverless function
           try {
-            // Try to trigger directly if possible
-            const directResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/process-transcriptions`, {
+            // Simply trigger the process without waiting for response
+            fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/process-transcriptions`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -459,16 +459,15 @@ export async function POST(request: NextRequest) {
                 feedbackId: feedback.id,
                 questionIds: pendingVoiceTranscriptions
               }),
-              // Add timeout to prevent hanging
-              signal: AbortSignal.timeout(2000) // 2-second timeout
+              // Don't wait for the response
+            }).catch(err => {
+              // Just log the error, but we don't need to handle it
+              console.log('Async transcription trigger initiated, will be processed by background job if needed');
             });
-            
-            console.log('Direct transcription response status:', directResponse.status);
           } catch (fetchError) {
-            // If direct trigger fails, that's okay - we've already marked the records
-            console.log('Direct transcription trigger failed, will be processed by background job');
-            console.error('Fetch error details:', fetchError);
+            console.log('Failed to initiate transcription process, will be handled by background job');
           }
+          
         }
       } catch (error) {
         console.error('Error starting transcription process:', error);
