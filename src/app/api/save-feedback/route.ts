@@ -311,23 +311,27 @@ export async function POST(request: NextRequest) {
       const questionResponsesArray = [];
       
       // Process NPS score and feedback together if present
-if (npsScore !== null || feedbackText || questionVoiceFiles['nps_score'] || questionVoiceFiles['nps_feedback']) {
-  console.log('Processing consolidated NPS entry');
-  const npsEntry: {
-    feedback_submission_id: string;
-    question_id: string;
-    response_value: string | null;
-    voice_file_url: string | null;
-    transcription: string | null;
-    transcription_status: string | null;
-  } = {
-    feedback_submission_id: feedback.id,
-    question_id: 'nps_score',
-    response_value: npsScore !== null ? npsScore.toString() : null,
-    voice_file_url: null,
-    transcription: null,
-    transcription_status: null
-  };
+      if (npsScore !== null || feedbackText || questionVoiceFiles['nps_score'] || questionVoiceFiles['nps_feedback'] || 
+        (questionResponses && questionResponses['nps_score'])) {  // Add this condition
+      console.log('Processing consolidated NPS entry');
+      const npsEntry: {
+        feedback_submission_id: string;
+        question_id: string;
+        response_value: string | null;
+        voice_file_url: string | null;
+        transcription: string | null;
+        transcription_status: string | null;
+      } = {
+        feedback_submission_id: feedback.id,
+        question_id: 'nps_score',
+        // Use the score from questionResponses if available, else use npsScore
+        response_value: (questionResponses && questionResponses['nps_score']) 
+                       ? questionResponses['nps_score']
+                       : (npsScore !== null ? npsScore.toString() : null),
+        voice_file_url: null,
+        transcription: null,
+        transcription_status: null
+      };
   
   // Add voice file if present - prefer nps_score but fall back to nps_feedback
   if (questionVoiceFiles['nps_score']) {
