@@ -29,7 +29,6 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   
   // Colors for sentiment badges
   const sentimentColors = {
@@ -43,7 +42,6 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
   const analyzeFeedback = async () => {
     setIsLoading(true);
     setError(null);
-    setDebugInfo(null);
     
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/analyze`, {
@@ -61,11 +59,7 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
       }
       
       const data = await response.json();
-      
-      // Debug logging to check the response structure
-      console.log('Analysis response:', data);
-      setDebugInfo(JSON.stringify(data, null, 2));
-      
+            
       if (data.topics) {
         setTopicData(data.topics);
         
@@ -164,12 +158,6 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
         </div>
       )}
       
-      {debugInfo && (
-        <div className="bg-gray-50 border border-gray-200 text-gray-800 px-4 py-3 rounded-lg text-sm overflow-auto max-h-40">
-          <h4 className="font-semibold mb-2">Debug Info:</h4>
-          <pre>{debugInfo}</pre>
-        </div>
-      )}
       
       {topicData && (
         <div className="bg-white rounded-lg shadow p-6">
