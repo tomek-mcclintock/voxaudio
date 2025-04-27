@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { createClusterMap, extractTopics } from '@/lib/clustering';
+import { analyzeFeedbackTopics } from '@/lib/clustering';
 
 // Set to nodejs runtime to allow longer execution
 export const runtime = 'nodejs';
@@ -117,16 +117,13 @@ export async function POST(
     
     console.log(`Retrieved ${feedbackEntries.length} feedback entries for analysis`);
     
-    // Process clustering and topic extraction in parallel for better performance
-    console.log('Starting parallel processing of clusters and topics');
-    const parallelStartTime = Date.now();
+    // Process topic analysis
+    console.log('Starting topic analysis...');
+    const analysisStartTime = Date.now();
     
-    const [clusters, topics] = await Promise.all([
-      processClustering(feedbackEntries),
-      processTopics(feedbackEntries)
-    ]);
+    const topics = await analyzeFeedbackTopics(feedbackEntries);
     
-    console.log(`Parallel processing completed in ${Date.now() - parallelStartTime}ms`);
+    console.log(`Topic analysis completed in ${Date.now() - analysisStartTime}ms`);
     
     // Calculate some basic statistics
     const sentimentCounts = {
@@ -142,7 +139,6 @@ export async function POST(
     
     // Return the results
     return NextResponse.json({
-      clusters,
       topics,
       feedbackCount: feedbackEntries.length,
       stats: {
@@ -167,72 +163,6 @@ export async function POST(
       },
       { status: 500 }
     );
-  }
-}
-
-/**
- * Process clustering analysis with error handling
- */
-async function processClustering(feedbackEntries: any[]) {
-  try {
-    console.log(`Creating clusters from ${feedbackEntries.length} feedback entries`);
-    return await createClusterMap(feedbackEntries);
-  } catch (error) {
-    console.error('Error in clustering:', error);
-    // Return a minimal valid result instead of failing
-    return {
-      themes: ['Error Processing Themes'],
-      clusters: {
-        'Error Processing Themes': []
-      },
-      summary: 'There was an error creating clusters. Please try again with fewer feedback entries.'
-    };
-  }
-}
-
-/**
- * Process topic extraction with error handling
- */
-async function processTopics(feedbackEntries: any[]) {
-  try {
-    // Extract all feedback texts for topic extraction
-    const feedbackTexts = feedbackEntries.map(entry => {
-      let text = '';
-      
-      // Add NPS score if available
-      if (entry.nps_score !== null) {
-        text += `NPS Score: ${entry.nps_score}/10. `;
-      }
-      
-      // Add main transcription if available
-      if (entry.transcription) {
-        text += entry.transcription + ' ';
-      }
-      
-      // Add question responses
-      if (entry.question_responses && entry.question_responses.length > 0) {
-        entry.question_responses.forEach((response: any) => {
-          if (response.transcription) {
-            text += response.transcription + ' ';
-          } else if (response.response_value) {
-            text += response.response_value + ' ';
-          }
-        });
-      }
-      
-      return text.trim();
-    }).filter(Boolean);
-    
-    console.log('Extracting topics from feedback texts');
-    return await extractTopics(feedbackTexts);
-  } catch (error) {
-    console.error('Error extracting topics:', error);
-    // Return a minimal valid result 
-    return {
-      topics: ['General Feedback'],
-      keyPhrases: ['No phrases extracted'],
-      featureMentions: []
-    };
   }
 }
 
