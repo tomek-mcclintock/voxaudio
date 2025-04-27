@@ -156,16 +156,9 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         // Only calculate NPS if the campaign includes NPS questions
         let averageNPS = null;
         if (data.campaign.include_nps) {
-          // Extract NPS scores from question_responses
+          // Extract NPS scores
           const npsScores = data.feedback
-            .map((f: FeedbackData) => {
-              // First check for traditional nps_score field (backward compatibility)
-              if (f.nps_score !== null) return f.nps_score;
-              
-              // Then check question_responses for an nps_score entry
-              const npsResponse = f.question_responses?.find(r => r.question_id === 'nps_score');
-              return npsResponse ? parseInt(npsResponse.response_value) : null;
-            })
+            .map((f: FeedbackData) => f.nps_score)
             .filter((score: number | null) => score !== null);
           
           // Calculate proper NPS (-100 to 100 scale)
@@ -181,7 +174,11 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         const stats: CampaignStats = {
           totalResponses,
           averageNPS,
-          responsesWithVoice: data.feedback.filter((f: FeedbackData) => f.transcription).length,
+          responsesWithVoice: data.feedback.filter((f: FeedbackData) => {
+            // Check for transcription from NPS feedback or question_responses
+            const npsResponse = f.question_responses?.find(r => r.question_id === 'nps_score');
+            return npsResponse?.transcription || f.transcription;
+          }).length,
           positiveCount: data.feedback.filter((f: FeedbackData) => f.sentiment === 'positive').length,
           negativeCount: data.feedback.filter((f: FeedbackData) => f.sentiment === 'negative').length,
           neutralCount: data.feedback.filter((f: FeedbackData) => f.sentiment === 'neutral').length,
@@ -295,7 +292,12 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
       // Add NPS data if included
       if (campaign.include_nps) {
         row.push(item.nps_score !== null ? item.nps_score.toString() : 'N/A');
-        row.push(item.transcription || '');
+        
+        // Use NPS transcription from question_responses
+        const npsResponse = item.question_responses?.find(r => r.question_id === 'nps_score');
+        const npsTranscription = npsResponse?.transcription || item.transcription || '';
+        row.push(npsTranscription);
+        
         row.push(item.sentiment || '');
       }
       
@@ -558,13 +560,21 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
                         {item.sentiment || 'N/A'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {item.transcription ? (
-                          <div className="max-w-xl break-words whitespace-pre-wrap">
-                            {item.transcription}
-                          </div>
-                        ) : (
-                          'No voice feedback'
-                        )}
+                        {(() => {
+                          // Look for transcription in question_responses for nps_score
+                          const npsResponse = item.question_responses?.find(r => r.question_id === 'nps_score');
+                          const transcription = npsResponse?.transcription || item.transcription;
+                          
+                          if (transcription) {
+                            return (
+                              <div className="max-w-xl break-words whitespace-pre-wrap">
+                                {transcription}
+                              </div>
+                            );
+                          } else {
+                            return 'No voice feedback';
+                          }
+                        })()}
                       </td>
                     </>
                   )}

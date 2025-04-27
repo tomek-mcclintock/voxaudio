@@ -25,16 +25,15 @@ interface MigrationResults {
   errors: MigrationError[];
 }
 
-
 export async function GET(request: NextRequest) {
   try {
     console.log('Starting feedback data migration...');
     
-    // Get all feedback submissions with transcriptions or voice files - MODIFIED QUERY
+    // Get all feedback submissions with legacy fields not yet migrated
     const { data: submissions, error: fetchError } = await serviceRoleClient
       .from('feedback_submissions')
       .select('id, company_id, campaign_id, transcription, voice_file_url, nps_score')
-      .or('transcription.neq.null,voice_file_url.neq.null')
+      .or('transcription.neq.null,voice_file_url.neq.null,nps_score.neq.null')
       .order('created_at', { ascending: false });
     
     if (fetchError) {
@@ -50,7 +49,6 @@ export async function GET(request: NextRequest) {
       npsScoresMigrated: 0,
       errors: []
     };
-
     
     // Process each submission
     for (const submission of submissions || []) {
@@ -105,7 +103,7 @@ export async function GET(request: NextRequest) {
               throw new Error(`Failed to update response: ${updateError.message}`);
             }
           }
-        } else {
+        } else if (submission.nps_score !== null || submission.transcription || submission.voice_file_url) {
           // Create new entry for NPS feedback
           const newResponse: any = {
             feedback_submission_id: submission.id,

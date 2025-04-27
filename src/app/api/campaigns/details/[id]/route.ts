@@ -19,9 +19,6 @@ interface QuestionResponse {
 interface FeedbackSubmission {
   created_at: string;
   order_id: string | null;
-  nps_score: number | null;
-  transcription: string | null;
-  sentiment: string | null;
   question_responses: QuestionResponse[] | null;
 }
 
@@ -62,46 +59,65 @@ export async function GET(
 
     console.log('Retrieved campaign:', campaign);
 
-    // Get feedback for this campaign - without comments in the query string
-    const { data: feedback, error: feedbackError } = await supabase
+    // Get feedback submissions for this campaign
+    const { data: submissions, error: submissionsError } = await supabase
       .from('feedback_submissions')
       .select(`
+        id,
         created_at,
         order_id,
-        nps_score,
-        transcription,
-        sentiment,
-        question_responses (*)
+        sentiment
       `)
       .eq('campaign_id', params.id)
       .eq('company_id', userData.company_id)
       .order('created_at', { ascending: false });
 
-    if (feedbackError) {
-      console.error('Error fetching feedback:', feedbackError);
-      throw feedbackError;
+    if (submissionsError) {
+      console.error('Error fetching submissions:', submissionsError);
+      throw submissionsError;
     }
 
-    // Process feedback to ensure all fields are available regardless of storage location
-    const processedFeedback = (feedback || []).map((item: FeedbackSubmission) => {
-      // Check for NPS score in question_responses
-      const npsScoreResponse = item.question_responses?.find((r: QuestionResponse) => r.question_id === 'nps_score');
-      const npsScore = npsScoreResponse && npsScoreResponse.response_value
+    // Get all question responses for all feedback submissions
+    if (!submissions || submissions.length === 0) {
+      return NextResponse.json({
+        campaign,
+        feedback: []
+      });
+    }
+
+    const submissionIds = submissions.map(sub => sub.id);
+    
+    const { data: allResponses, error: responsesError } = await supabase
+      .from('question_responses')
+      .select('*')
+      .in('feedback_submission_id', submissionIds);
+
+    if (responsesError) {
+      console.error('Error fetching question responses:', responsesError);
+      throw responsesError;
+    }
+
+    // Map responses to their submissions
+    const processedFeedback = submissions.map(submission => {
+      // Find all responses for this submission
+      const responses = allResponses?.filter(
+        response => response.feedback_submission_id === submission.id
+      ) || [];
+
+      // Find NPS score response
+      const npsScoreResponse = responses.find(r => r.question_id === 'nps_score');
+      const npsScore = npsScoreResponse?.response_value 
         ? parseInt(npsScoreResponse.response_value) 
-        : item.nps_score; // Fallback to legacy field
+        : null;
       
-      // Check for NPS feedback text/transcription in question_responses
-      const npsFeedbackResponse = item.question_responses?.find((r: QuestionResponse) => r.question_id === 'nps_feedback');
-      const transcription = 
-        (npsFeedbackResponse?.transcription) || 
-        (npsFeedbackResponse?.response_value) || 
-        item.transcription;
-      
-      // Create a new object with all the original properties plus our updated ones
+      // Use the transcription from the NPS response (if exists)
+      const transcription = npsScoreResponse?.transcription || null;
+
       return {
-        ...item,
+        ...submission,
         nps_score: npsScore,
-        transcription
+        transcription,
+        question_responses: responses
       };
     });
 
