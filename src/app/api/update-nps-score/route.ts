@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     
     if (existingSubmission) {
-      // Update the existing submission (keep metadata but remove nps_score)
+      // Update the existing submission metadata but NOT the nps_score
       const { error: updateError } = await serviceRoleClient
         .from('feedback_submissions')
         .update({ 
