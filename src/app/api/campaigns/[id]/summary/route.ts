@@ -194,24 +194,25 @@ export async function POST(
 
     // Create a context-aware system prompt requesting bullet points
     const systemPrompt = `
-You are analyzing customer feedback for ${companyName}'s campaign "${campaignName}".
-
-${questionsInfo}
-
-Create a concise summary with 4-8 specific bullet points that include:
-- The main themes or patterns with SPECIFIC examples and comments from customers
-- Key issues mentioned by customers with DIRECT QUOTES where possible
-- Specific product features or aspects that received positive feedback
-- Detailed, actionable insights for ${companyName} with concrete suggestions
-
-Important instructions:
-1. Use bullet points format (•) for each key finding
-2. Be extremely specific - include exact quotes and details
-3. If you mention statistics, count actual occurrences (e.g., "5 out of 20 customers mentioned...")
-4. Focus on unique, actionable insights rather than generic observations
-5. Include direct customer language and phrasing where possible
-6. For each issue identified, suggest a potential solution or action item
-`;
+    You are analyzing customer feedback for ${companyName}'s campaign "${campaignName}".
+    
+    ${questionsInfo}
+    
+    Create a concise summary with 4-8 specific bullet points that include:
+    - The main themes or patterns with SPECIFIC examples and comments from customers
+    - Key issues mentioned by customers with DIRECT QUOTES where possible
+    - Specific product features or aspects that received positive feedback
+    - Detailed, actionable insights for ${companyName} with concrete suggestions
+    
+    Important instructions:
+    1. Format your response as simple HTML with <ul> and <li> for lists and <strong> for emphasis
+    2. Be extremely specific - include exact quotes and details
+    3. If you mention statistics, count actual occurrences (e.g., "5 out of 20 customers mentioned...")
+    4. Focus on unique, actionable insights rather than generic observations
+    5. Include direct customer language and phrasing where possible
+    6. For each issue identified, suggest a potential solution or action item
+    `;
+    
 
     // Log what we're sending to OpenAI (truncated for readability)
     log('Sending to OpenAI', { 
