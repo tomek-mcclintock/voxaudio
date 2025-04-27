@@ -7,6 +7,7 @@ import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as XLSX from 'xlsx';
+import ReactMarkdown from 'react-markdown';
 
 interface CampaignData {
   id: string;
@@ -422,18 +423,18 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold mb-4">Feedback Summary</h2>
           <div className="text-gray-700">
-            {/* Check if the summary is in bullet point format */}
-            {summary.includes('•') ? (
-              // If summary contains bullet points, render as a list
-              <ul className="list-disc pl-6 space-y-2">
-                {summary.split('•').filter(Boolean).map((point, index) => (
-                  <li key={index}>{point.trim()}</li>
-                ))}
-              </ul>
-            ) : (
-              // If not in bullet format, render as regular text
-              <p className="whitespace-pre-line">{summary}</p>
-            )}
+            <ReactMarkdown
+              components={{
+                // Apply classes to specific elements
+                p: ({node, ...props}) => <p className="mb-4" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-6 space-y-2 mb-4" {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal pl-6 space-y-2 mb-4" {...props} />,
+                li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                strong: ({node, ...props}) => <strong className="font-semibold" {...props} />
+              }}
+            >
+              {summary}
+            </ReactMarkdown>
           </div>
         </div>
       )}
