@@ -29,6 +29,7 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   
   // Colors for sentiment badges
   const sentimentColors = {
@@ -42,6 +43,7 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
   const analyzeFeedback = async () => {
     setIsLoading(true);
     setError(null);
+    setDebugInfo(null);
     
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/analyze`, {
@@ -59,18 +61,32 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
       }
       
       const data = await response.json();
-      setTopicData(data.topics);
       
-      // Save the analysis to the campaign
-      await fetch(`/api/campaigns/${campaignId}/save-analysis`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          topicAnalysis: data.topics
-        })
-      });
+      // Debug logging to check the response structure
+      console.log('Analysis response:', data);
+      setDebugInfo(JSON.stringify(data, null, 2));
+      
+      if (data.topics) {
+        setTopicData(data.topics);
+        
+        // Save the analysis to the campaign
+        try {
+          await fetch(`/api/campaigns/${campaignId}/save-analysis`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              topicAnalysis: data.topics
+            })
+          });
+        } catch (saveError) {
+          console.error('Error saving analysis:', saveError);
+          // Don't block the UI if saving fails
+        }
+      } else {
+        throw new Error('No topic data found in the response');
+      }
     } catch (err) {
       console.error('Error analyzing feedback:', err);
       setError(err instanceof Error ? err.message : 'Failed to analyze feedback');
@@ -87,6 +103,7 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
         
         if (response.ok) {
           const data = await response.json();
+          console.log('Loaded saved analysis:', data);
           if (data.topicAnalysis) {
             setTopicData(data.topicAnalysis);
           }
@@ -147,11 +164,18 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
         </div>
       )}
       
+      {debugInfo && (
+        <div className="bg-gray-50 border border-gray-200 text-gray-800 px-4 py-3 rounded-lg text-sm overflow-auto max-h-40">
+          <h4 className="font-semibold mb-2">Debug Info:</h4>
+          <pre>{debugInfo}</pre>
+        </div>
+      )}
+      
       {topicData && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-medium mb-4">Main Topics with Example Feedback</h3>
           <div className="flex flex-wrap gap-2 mb-6">
-            {topicData.topics.slice(0, 10).map((topic, index) => (
+            {topicData.topics && topicData.topics.slice(0, 10).map((topic, index) => (
               <div key={index} className="px-3 py-1 rounded-full bg-blue-100 text-blue-800">
                 {topic}
               </div>
@@ -159,7 +183,7 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
           </div>
           
           <div className="space-y-4">
-            {topicData.featureMentions.map((feature, index) => (
+            {topicData.featureMentions && topicData.featureMentions.map((feature, index) => (
               <div key={index} className="border rounded-lg overflow-hidden">
                 <div 
                   className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50"
@@ -181,7 +205,7 @@ export default function TopicAnalysis({ campaignId, feedback }: TopicAnalysisPro
                   )}
                 </div>
                 
-                {expandedFeature === feature.feature && feature.examples.length > 0 && (
+                {expandedFeature === feature.feature && feature.examples && feature.examples.length > 0 && (
                   <div className="p-4 bg-gray-50 border-t">
                     <h4 className="text-sm font-medium text-gray-500 mb-2">Example Mentions:</h4>
                     <ul className="space-y-2">

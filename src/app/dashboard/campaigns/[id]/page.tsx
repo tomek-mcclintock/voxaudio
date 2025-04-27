@@ -7,7 +7,7 @@ import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as XLSX from 'xlsx';
-import FeedbackClustering from '@/components/FeedbackClustering';
+import TopicAnalysis from '@/components/TopicAnalysis';
 
 interface CampaignData {
   id: string;
@@ -113,7 +113,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
   const [summary, setSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [hasPendingTranscriptions, setHasPendingTranscriptions] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'analysis'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'topics'>('overview');
 
   useEffect(() => {
     // Check if there are pending transcriptions
@@ -415,17 +415,18 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
             Overview
           </button>
           <button
-            onClick={() => setActiveTab('analysis')}
+            onClick={() => setActiveTab('topics')}
             className={`px-1 py-4 text-sm font-medium border-b-2 ${
-              activeTab === 'analysis'
+              activeTab === 'topics'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Advanced Analysis
+            Topic Analysis
           </button>
         </nav>
       </div>
+
 
       {/* Action Buttons */}
       <div className="flex gap-4 mb-8">
@@ -647,10 +648,9 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
           </div>
         </div>
       ) : (
-        // Advanced Analysis Tab Content
+        // Topic Analysis Tab Content
         <div>
-          {/* Feedback Clustering Component */}
-          <FeedbackClustering campaignId={params.id} feedback={feedback} />
+          <TopicAnalysis campaignId={params.id} feedback={feedback} />
         </div>
       )}
     </div>
