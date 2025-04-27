@@ -7,7 +7,7 @@ import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as XLSX from 'xlsx';
-import ReactMarkdown from 'react-markdown';
+import FeedbackClustering from '@/components/FeedbackClustering';
 
 interface CampaignData {
   id: string;
@@ -113,6 +113,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
   const [summary, setSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [hasPendingTranscriptions, setHasPendingTranscriptions] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'analysis'>('overview');
 
   useEffect(() => {
     // Check if there are pending transcriptions
@@ -400,6 +401,32 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="mb-6 border-b">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-1 py-4 text-sm font-medium border-b-2 ${
+              activeTab === 'overview'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('analysis')}
+            className={`px-1 py-4 text-sm font-medium border-b-2 ${
+              activeTab === 'analysis'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Advanced Analysis
+          </button>
+        </nav>
+      </div>
+
       {/* Action Buttons */}
       <div className="flex gap-4 mb-8">
         <button
@@ -409,220 +436,233 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
           Export to Excel
         </button>
         
-        <button
-          onClick={generateSummary}
-          disabled={isGeneratingSummary}
-          className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded transition-colors disabled:bg-gray-400"
-        >
-          {isGeneratingSummary ? 'Generating...' : 'Generate Summary'}
-        </button>
+        {activeTab === 'overview' && (
+          <button
+            onClick={generateSummary}
+            disabled={isGeneratingSummary}
+            className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded transition-colors disabled:bg-gray-400"
+          >
+            {isGeneratingSummary ? 'Generating...' : 'Generate Summary'}
+          </button>
+        )}
       </div>
 
-      {/* Summary Section */}
-      {summary && (
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Feedback Summary</h2>
-          <div className="text-gray-700">
-            <ReactMarkdown
-              components={{
-                // Apply classes to specific elements
-                p: ({node, ...props}) => <p className="mb-4" {...props} />,
-                ul: ({node, ...props}) => <ul className="list-disc pl-6 space-y-2 mb-4" {...props} />,
-                ol: ({node, ...props}) => <ol className="list-decimal pl-6 space-y-2 mb-4" {...props} />,
-                li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                strong: ({node, ...props}) => <strong className="font-semibold" {...props} />
-              }}
-            >
-              {summary}
-            </ReactMarkdown>
-          </div>
-        </div>
-      )}
-
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Responses</h3>
-            <p className="text-3xl font-semibold">{stats.totalResponses}</p>
-          </div>
-          {campaign.include_nps && stats.averageNPS !== null && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500">NPS Score</h3>
-              <p className="text-3xl font-semibold">{stats.averageNPS.toFixed(1)}</p>
-              <p className="text-xs text-gray-500">Range: -100 to 100</p>
+      {activeTab === 'overview' ? (
+        // Overview Tab Content
+        <div>
+          {/* Summary Section */}
+          {summary && (
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <h2 className="text-lg font-semibold mb-4">Feedback Summary</h2>
+              <div className="text-gray-700">
+                {/* Check if the summary is in bullet point format */}
+                {summary.includes('•') ? (
+                  // If summary contains bullet points, render as a list
+                  <ul className="list-disc pl-6 space-y-2">
+                    {summary.split('•').filter(Boolean).map((point, index) => (
+                      <li key={index}>{point.trim()}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  // If not in bullet format, render as regular text
+                  <p className="whitespace-pre-line">{summary}</p>
+                )}
+              </div>
             </div>
           )}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Voice Responses</h3>
-            <p className="text-3xl font-semibold">{stats.responsesWithVoice}</p>
-          </div>
-        </div>
-      )}
 
-      {/* NPS Trend Chart - Only show if campaign includes NPS */}
-      {campaign.include_nps && chartData.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">NPS Score Trend</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis 
-                  domain={[-100, 100]} 
-                  ticks={[-100, -50, 0, 50, 100]} 
-                  label={{ value: 'NPS Score', angle: -90, position: 'insideLeft' }} 
-                />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="nps" 
-                  stroke="#2563eb" 
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          {stats && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-sm font-medium text-gray-500">Total Responses</h3>
+                <p className="text-3xl font-semibold">{stats.totalResponses}</p>
+              </div>
+              {campaign.include_nps && stats.averageNPS !== null && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-sm font-medium text-gray-500">NPS Score</h3>
+                  <p className="text-3xl font-semibold">{stats.averageNPS.toFixed(1)}</p>
+                  <p className="text-xs text-gray-500">Range: -100 to 100</p>
+                </div>
+              )}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-sm font-medium text-gray-500">Voice Responses</h3>
+                <p className="text-3xl font-semibold">{stats.responsesWithVoice}</p>
+              </div>
+            </div>
+          )}
 
-      {/* Sentiment Analysis - Only show if campaign includes NPS */}
-      {campaign.include_nps && stats && (stats.positiveCount > 0 || stats.negativeCount > 0 || stats.neutralCount > 0) && (
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Sentiment Analysis</h2>
-          <div className="flex gap-4">
-            <div className="flex-1 bg-green-50 p-4 rounded-lg">
-              <div className="text-green-700 font-semibold mb-2">Positive</div>
-              <div className="text-3xl font-bold text-green-600">{stats.positiveCount}</div>
+          {/* NPS Trend Chart - Only show if campaign includes NPS */}
+          {campaign.include_nps && chartData.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <h2 className="text-lg font-semibold mb-4">NPS Score Trend</h2>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis 
+                      domain={[-100, 100]} 
+                      ticks={[-100, -50, 0, 50, 100]} 
+                      label={{ value: 'NPS Score', angle: -90, position: 'insideLeft' }} 
+                    />
+                    <Tooltip />
+                    <Line 
+                      type="monotone" 
+                      dataKey="nps" 
+                      stroke="#2563eb" 
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="flex-1 bg-gray-50 p-4 rounded-lg">
-              <div className="text-gray-700 font-semibold mb-2">Neutral</div>
-              <div className="text-3xl font-bold text-gray-600">{stats.neutralCount}</div>
-            </div>
-            <div className="flex-1 bg-red-50 p-4 rounded-lg">
-              <div className="text-red-700 font-semibold mb-2">Negative</div>
-              <div className="text-3xl font-bold text-red-600">{stats.negativeCount}</div>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Recent Feedback Table */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b">
-          <h2 className="text-lg font-semibold">Recent Feedback</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                {campaign.include_nps && (
-                  <>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NPS Score</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
-                  </>
-                )}
-                {/* Dynamically create columns for custom questions */}
-                {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => (
-                  <th key={question.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    {question.text.length > 30 ? question.text.substring(0, 30) + '...' : question.text}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {feedback.map((item, index) => (
-                <tr key={index}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(item.created_at).toLocaleDateString()}
-                  </td>
-                  
-                  {/* NPS related columns - only if campaign includes NPS */}
-                  {campaign.include_nps && (
-                    <>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {item.nps_score !== null ? (
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
-                            item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {item.nps_score}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">N/A</span>
-                        )}
-                      </td>
+          {/* Sentiment Analysis - Only show if campaign includes NPS */}
+          {campaign.include_nps && stats && (stats.positiveCount > 0 || stats.negativeCount > 0 || stats.neutralCount > 0) && (
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <h2 className="text-lg font-semibold mb-4">Sentiment Analysis</h2>
+              <div className="flex gap-4">
+                <div className="flex-1 bg-green-50 p-4 rounded-lg">
+                  <div className="text-green-700 font-semibold mb-2">Positive</div>
+                  <div className="text-3xl font-bold text-green-600">{stats.positiveCount}</div>
+                </div>
+                <div className="flex-1 bg-gray-50 p-4 rounded-lg">
+                  <div className="text-gray-700 font-semibold mb-2">Neutral</div>
+                  <div className="text-3xl font-bold text-gray-600">{stats.neutralCount}</div>
+                </div>
+                <div className="flex-1 bg-red-50 p-4 rounded-lg">
+                  <div className="text-red-700 font-semibold mb-2">Negative</div>
+                  <div className="text-3xl font-bold text-red-600">{stats.negativeCount}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Feedback Table */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b">
+              <h2 className="text-lg font-semibold">Recent Feedback</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    {campaign.include_nps && (
+                      <>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NPS Score</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
+                      </>
+                    )}
+                    {/* Dynamically create columns for custom questions */}
+                    {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => (
+                      <th key={question.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        {question.text.length > 30 ? question.text.substring(0, 30) + '...' : question.text}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {feedback.map((item, index) => (
+                    <tr key={index}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.sentiment || 'N/A'}
+                        {new Date(item.created_at).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {(() => {
-                          // Look for transcription in question_responses for nps_score
-                          const npsResponse = item.question_responses?.find(r => r.question_id === 'nps_score');
-                          const transcription = npsResponse?.transcription || item.transcription;
-                          
-                          if (transcription) {
-                            return (
-                              <div className="max-w-xl break-words whitespace-pre-wrap">
-                                {transcription}
-                              </div>
-                            );
-                          } else {
-                            return 'No voice feedback';
-                          }
-                        })()}
-                      </td>
-                    </>
-                  )}
-                  
-                  {/* Question response columns - for all campaigns */}
-                  {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => {
-                    // Find the response for this question
-                    const response = item.question_responses?.find(r => r.question_id === question.id);
-                    
-                    return (
-                      <td key={question.id} className="px-6 py-4 text-sm text-gray-500">
-                        {response ? (
-                          <div className="space-y-1">
-                            {/* If there's a voice response with transcription */}
-                            {response.transcription && (
-                              <div className="max-w-xl break-words whitespace-pre-wrap">
-                                <span className="text-blue-500 font-medium">[Voice]</span> {response.transcription}
-                              </div>
+                      
+                      {/* NPS related columns - only if campaign includes NPS */}
+                      {campaign.include_nps && (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {item.nps_score !== null ? (
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                item.nps_score >= 9 ? 'bg-green-100 text-green-800' :
+                                item.nps_score >= 7 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {item.nps_score}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">N/A</span>
                             )}
-                            
-                            {/* For voice response pending transcription */}
-                            {response.voice_file_url && !response.transcription && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-blue-500 font-medium">[Voice]</span>
-                                {getTranscriptionStatus(response.transcription_status)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.sentiment || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {(() => {
+                              // Look for transcription in question_responses for nps_score
+                              const npsResponse = item.question_responses?.find(r => r.question_id === 'nps_score');
+                              const transcription = npsResponse?.transcription || item.transcription;
+                              
+                              if (transcription) {
+                                return (
+                                  <div className="max-w-xl break-words whitespace-pre-wrap">
+                                    {transcription}
+                                  </div>
+                                );
+                              } else {
+                                return 'No voice feedback';
+                              }
+                            })()}
+                          </td>
+                        </>
+                      )}
+                      
+                      {/* Question response columns - for all campaigns */}
+                      {campaign.questions && campaign.questions.length > 0 && campaign.questions.map((question) => {
+                        // Find the response for this question
+                        const response = item.question_responses?.find(r => r.question_id === question.id);
+                        
+                        return (
+                          <td key={question.id} className="px-6 py-4 text-sm text-gray-500">
+                            {response ? (
+                              <div className="space-y-1">
+                                {/* If there's a voice response with transcription */}
+                                {response.transcription && (
+                                  <div className="max-w-xl break-words whitespace-pre-wrap">
+                                    <span className="text-blue-500 font-medium">[Voice]</span> {response.transcription}
+                                  </div>
+                                )}
+                                
+                                {/* For voice response pending transcription */}
+                                {response.voice_file_url && !response.transcription && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-blue-500 font-medium">[Voice]</span>
+                                    {getTranscriptionStatus(response.transcription_status)}
+                                  </div>
+                                )}
+                                
+                                {/* For text response */}
+                                {response.response_value && !response.transcription && (
+                                  <div className="max-w-xl break-words whitespace-pre-wrap">
+                                    {formatResponseValue(response.response_value)}
+                                  </div>
+                                )}
                               </div>
+                            ) : (
+                              <span className="text-gray-400">No response</span>
                             )}
-                            
-                            {/* For text response */}
-                            {response.response_value && !response.transcription && (
-                              <div className="max-w-xl break-words whitespace-pre-wrap">
-                                {formatResponseValue(response.response_value)}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">No response</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        // Advanced Analysis Tab Content
+        <div>
+          {/* Feedback Clustering Component */}
+          <FeedbackClustering campaignId={params.id} feedback={feedback} />
+        </div>
+      )}
     </div>
   );
 }
