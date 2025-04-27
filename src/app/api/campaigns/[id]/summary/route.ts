@@ -137,8 +137,8 @@ export async function POST(
       questionsInfo += `- ${npsQuestion} (NPS score 1-10)\n`;
     }
 
-    // Limit number of feedback entries to process to avoid timeouts (max 20)
-    const limitedEntries = feedbackEntries.slice(0, 20);
+    // Limit number of feedback entries to process to avoid timeouts (max 200)
+    const limitedEntries = feedbackEntries.slice(0, 200);
     log(`Processing ${limitedEntries.length} feedback entries (limited from ${feedbackEntries.length})`);
 
     // Combine all feedback texts with question responses
@@ -198,18 +198,19 @@ You are analyzing customer feedback for ${companyName}'s campaign "${campaignNam
 
 ${questionsInfo}
 
-Create a concise summary with 3-6 bullet points highlighting:
-- The main themes or patterns found in customer feedback
-- Key issues mentioned by customers
-- Notable positive feedback
-- Actionable insights for ${companyName}
+Create a concise summary with 4-8 specific bullet points that include:
+- The main themes or patterns with SPECIFIC examples and comments from customers
+- Key issues mentioned by customers with DIRECT QUOTES where possible
+- Specific product features or aspects that received positive feedback
+- Detailed, actionable insights for ${companyName} with concrete suggestions
 
 Important instructions:
 1. Use bullet points format (•) for each key finding
-2. Be specific about what customers are saying
-3. Do NOT invent or estimate percentages unless you can truly count occurrences
-4. Keep each bullet point brief (1-2 sentences)
-5. Focus only on information explicitly present in the feedback
+2. Be extremely specific - include exact quotes and details
+3. If you mention statistics, count actual occurrences (e.g., "5 out of 20 customers mentioned...")
+4. Focus on unique, actionable insights rather than generic observations
+5. Include direct customer language and phrasing where possible
+6. For each issue identified, suggest a potential solution or action item
 `;
 
     // Log what we're sending to OpenAI (truncated for readability)
