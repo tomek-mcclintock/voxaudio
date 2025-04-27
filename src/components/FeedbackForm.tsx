@@ -63,7 +63,7 @@ export default function FeedbackForm({
   campaignId,
   companyData,
   campaignData,
-  npsScore: initialNpsScore,
+  npsScore: initialNpsScore = null,
   additionalParams = {}
 }: FeedbackFormProps) {
   // Get language from campaign or default to English
@@ -75,6 +75,9 @@ export default function FeedbackForm({
   };
 
   const [clientId, setClientId] = useState<string>('');
+
+  // Add a new state to track if we've saved the initial NPS score
+  const [initialNpsSaved, setInitialNpsSaved] = useState(false);
 
   useEffect(() => {
     // Generate a session-based identifier
@@ -90,6 +93,46 @@ export default function FeedbackForm({
       setClientId(newClientId);
     }
   }, []);
+
+  // Add a new useEffect to save the initial NPS score once we have the clientId
+  useEffect(() => {
+    // Only run this once when we have both the clientId and an initialNpsScore
+    // and we haven't saved it yet
+    if (clientId && initialNpsScore !== null && !initialNpsSaved && companyId && campaignId) {
+      const saveInitialNpsScore = async () => {
+        try {
+          console.log(`Saving initial NPS score: ${initialNpsScore} with clientId: ${clientId}`);
+          const updateData = new FormData();
+          updateData.append('companyId', companyId);
+          updateData.append('campaignId', campaignId);
+          updateData.append('npsScore', initialNpsScore.toString());
+          updateData.append('orderId', orderId || '');
+          updateData.append('clientId', clientId);
+          
+          // Include additional parameters if present
+          if (Object.keys(additionalParams).length > 0) {
+            updateData.append('additionalParams', JSON.stringify(additionalParams));
+          }
+          
+          const response = await fetch('/api/update-nps-score', {
+            method: 'POST',
+            body: updateData,
+          });
+          
+          if (!response.ok) {
+            console.error('Failed to update initial NPS score: Server returned', response.status);
+          } else {
+            console.log('Initial NPS score saved successfully');
+            setInitialNpsSaved(true);
+          }
+        } catch (error) {
+          console.error('Error saving initial NPS score:', error);
+        }
+      };
+      
+      saveInitialNpsScore();
+    }
+  }, [clientId, initialNpsScore, companyId, campaignId, orderId, additionalParams, initialNpsSaved]);
   
   const [npsScore, setNpsScore] = useState<number | null>(initialNpsScore ?? null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);

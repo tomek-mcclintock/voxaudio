@@ -8,6 +8,8 @@ import Header from '@/components/Header';
 import type { Campaign } from '@/types/campaign';
 import { generateUniqueSubmissionId } from '@/lib/utils';
 
+// We're removing this function since it's being moved to the client component
+// This will prevent the double submission issue
 async function saveInitialNpsScore(
   serviceClient: any, 
   companyId: string, 
@@ -15,68 +17,11 @@ async function saveInitialNpsScore(
   npsScore: number, 
   orderId: string,
   additionalParams: Record<string, string>,
-  clientId?: string // Add this parameter
+  clientId?: string
 ) {
-  if (npsScore === null || !companyId || !campaignId) return;
-  
-  try {
-    console.log(`Saving initial NPS score: ${npsScore} for company: ${companyId}, campaign: ${campaignId}`);
-    
-    // Generate the same unique identifier we'll use in other places
-    const submissionData = {
-      orderId: orderId || null,
-      companyId,
-      campaignId,
-      additionalParams,
-      clientId
-    };
-    
-    const submissionId = generateUniqueSubmissionId(submissionData);
-    console.log('Generated submission ID for initial NPS:', submissionId);
-    
-    // Check if a submission with this ID already exists
-    const { data: existingSubmission, error: queryError } = await serviceClient
-      .from('feedback_submissions')
-      .select('id, nps_score')
-      .eq('submission_identifier', submissionId)
-      .maybeSingle();
-    
-    if (queryError) {
-      console.error('Error checking for existing submission:', queryError);
-      // Continue to create a new one - better to have duplicate than lose data
-    }
-    
-    if (existingSubmission) {
-      // Update the existing submission
-      console.log(`Updating existing submission with ID: ${existingSubmission.id}`);
-      await serviceClient
-        .from('feedback_submissions')
-        .update({
-          nps_score: npsScore,
-          metadata: additionalParams
-        })
-        .eq('id', existingSubmission.id);
-    } else {
-      // Create a minimal submission with just the NPS score and metadata
-      await serviceClient
-        .from('feedback_submissions')
-        .insert({
-          company_id: companyId,
-          campaign_id: campaignId,
-          order_id: orderId || null,
-          nps_score: npsScore,
-          metadata: additionalParams,
-          processed: false,
-          submission_identifier: submissionId // Store the unique identifier
-        });
-    }
-    
-    console.log('Initial NPS score saved successfully');
-  } catch (error) {
-    console.error('Error saving initial NPS score:', error);
-  }
+  // Function implementation removed, as we're moving this logic to the client side
+  // to ensure we have access to the clientId
 }
-
 
 export default async function FeedbackPage({
   searchParams,
@@ -194,9 +139,9 @@ export default async function FeedbackPage({
     );
   }
 
-  if (npsScore !== null && companyId && campaignId) {
-    await saveInitialNpsScore(serviceClient, companyId, campaignId, npsScore, orderId, additionalParams);
-  }
+  // We're no longer calling saveInitialNpsScore here
+  // Instead, we'll let the client component handle the NPS score update
+  // after it has generated the clientId
 
   return (
     <div className="min-h-screen flex flex-col">
