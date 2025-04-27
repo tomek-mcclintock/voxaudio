@@ -82,32 +82,36 @@ export async function analyzeFeedback(text: string): Promise<{
   summary: string;
   themes: string[];
 }> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: "You are analyzing customer feedback for Ruggable UK. You will respond with JSON containing a 'sentiment' (positive/negative/neutral), a brief 'summary', and key 'themes' identified as an array."
-      },
-      {
-        role: "user",
-        content: text
-      }
-    ]
-  });
-
   try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are analyzing customer feedback. Based solely on the text provided, determine if the sentiment is 'positive', 'negative', or 'neutral'. Be decisive - if there's any clear emotional direction, choose positive or negative. Only use 'neutral' when truly ambiguous. Format your response as JSON with 'sentiment', 'summary', and 'themes' fields."
+        },
+        {
+          role: "user",
+          content: text
+        }
+      ]
+    });
+
     // Parse the response from the text format
     const content = response.choices[0].message.content;
     if (!content) {
       throw new Error('No content in response');
     }
-    return JSON.parse(content);
+    
+    const result = JSON.parse(content);
+    console.log('Sentiment analysis result:', result);
+    return result;
   } catch (error) {
-    // If parsing fails, return a structured response
+    console.error('Error in sentiment analysis:', error);
+    // Default to neutral if parsing fails
     return {
       sentiment: 'neutral',
-      summary: response.choices[0].message.content || 'No summary available',
+      summary: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
       themes: []
     };
   }
