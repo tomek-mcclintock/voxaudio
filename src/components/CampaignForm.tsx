@@ -1,8 +1,8 @@
-// src/components/CampaignForm.tsx - with gamification toggle added
+// src/components/CampaignForm.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, GripVertical, Mic, Type } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Mic, Type, ChevronDown, ChevronUp } from 'lucide-react';
 import type { CampaignQuestion, QuestionType } from '@/types/campaign';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
@@ -33,7 +33,7 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
   const [settings, setSettings] = useState({
     allowVoice: true,
     allowText: true,
-    enableGamification: initialData?.settings?.enableGamification ?? true, // New setting for gamification
+    enableGamification: initialData?.settings?.enableGamification ?? true,
     ...initialData?.settings
   });
   const [language, setLanguage] = useState(initialData?.language || 'en');
@@ -41,6 +41,28 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
   const [additionalFeedbackText, setAdditionalFeedbackText] = useState(
     initialData?.additionalFeedbackText || translate(language, 'form.additionalFeedbackPlaceholder')
   );
+
+  // New states for custom thank you pages
+  const [useCustomThankYouPages, setUseCustomThankYouPages] = useState(initialData?.useCustomThankYouPages ?? false);
+  const [thankYouPagePromoters, setThankYouPagePromoters] = useState(initialData?.thankYouPagePromoters || '');
+  const [thankYouPagePassives, setThankYouPagePassives] = useState(initialData?.thankYouPagePassives || '');
+  const [thankYouPageDetractors, setThankYouPageDetractors] = useState(initialData?.thankYouPageDetractors || '');
+
+  // State for expanded/collapsed sections of thank you pages
+  const [expandedThankYouPages, setExpandedThankYouPages] = useState({
+    promoters: false,
+    passives: false,
+    detractors: false
+  });
+
+  // Toggle function for expanding/collapsing thank you page sections
+  const toggleThankYouPageSection = (section: 'promoters' | 'passives' | 'detractors') => {
+    setExpandedThankYouPages(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   useEffect(() => {
     // Only update if it's still the default text (not user-modified)
     if (!initialData?.additionalFeedbackText && 
@@ -55,13 +77,14 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
     toolbar: [
       ['bold', 'italic'],
       [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      ['link'], // Added link formatting
       ['clean']
     ]
   };
   
   // Quill editor formats
   const quillFormats = [
-    'bold', 'italic', 'list', 'bullet'
+    'bold', 'italic', 'list', 'bullet', 'link'
   ];
 
   const addQuestion = (type: QuestionType) => {
@@ -118,7 +141,7 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
       end_date: endDate || null,
       include_nps: includeNps,
       nps_question: npsQuestion,
-      additionalFeedbackText: additionalFeedbackText, // Add the new field here
+      additionalFeedbackText: additionalFeedbackText,
       questions: includeAdditionalQuestions ? questions : [],
       settings: {
         ...settings,
@@ -126,7 +149,12 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
       },
       include_additional_questions: includeAdditionalQuestions,
       language,
-      introText
+      introText,
+      // Include the new custom thank you page fields
+      useCustomThankYouPages,
+      thankYouPagePromoters: useCustomThankYouPages ? thankYouPagePromoters : null,
+      thankYouPagePassives: useCustomThankYouPages ? thankYouPagePassives : null,
+      thankYouPageDetractors: useCustomThankYouPages ? thankYouPageDetractors : null
     };
     
     console.log('Client side - about to submit:', submitData);
@@ -267,6 +295,135 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
         )}
       </div>
 
+      {/* Custom Thank You Pages - New Section */}
+      {includeNps && (
+        <div className="space-y-4 border-t pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">Custom Thank You Pages</h3>
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={useCustomThankYouPages}
+                onChange={(e) => setUseCustomThankYouPages(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-600">Use custom thank you pages</span>
+            </label>
+          </div>
+          
+          {useCustomThankYouPages && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                Create custom thank you pages for different NPS score ranges. 
+                These pages will be shown after the user submits their feedback.
+              </p>
+              
+              {/* Promoters (9-10) Thank You Page */}
+              <div className="border rounded-lg p-4 bg-green-50">
+                <button 
+                  type="button"
+                  onClick={() => toggleThankYouPageSection('promoters')}
+                  className="flex justify-between items-center w-full text-left"
+                >
+                  <div className="font-medium text-green-700">Promoters (Scores 9-10)</div>
+                  {expandedThankYouPages.promoters ? 
+                    <ChevronUp className="w-5 h-5 text-green-700" /> : 
+                    <ChevronDown className="w-5 h-5 text-green-700" />}
+                </button>
+                
+                {expandedThankYouPages.promoters && (
+                  <div className="mt-4">
+                    <div className="mt-1">
+                      <ReactQuill
+                        value={thankYouPagePromoters}
+                        onChange={setThankYouPagePromoters}
+                        modules={quillModules}
+                        formats={quillFormats}
+                        theme="snow"
+                        className="bg-white"
+                        placeholder="Enter thank you content for promoters (scores 9-10)..."
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      This content will be shown to customers who give a score of 9 or 10 (promoters).
+                      Consider adding links to review sites.
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Passives (7-8) Thank You Page */}
+              <div className="border rounded-lg p-4 bg-yellow-50">
+                <button 
+                  type="button"
+                  onClick={() => toggleThankYouPageSection('passives')}
+                  className="flex justify-between items-center w-full text-left"
+                >
+                  <div className="font-medium text-yellow-700">Passives (Scores 7-8)</div>
+                  {expandedThankYouPages.passives ? 
+                    <ChevronUp className="w-5 h-5 text-yellow-700" /> : 
+                    <ChevronDown className="w-5 h-5 text-yellow-700" />}
+                </button>
+                
+                {expandedThankYouPages.passives && (
+                  <div className="mt-4">
+                    <div className="mt-1">
+                      <ReactQuill
+                        value={thankYouPagePassives}
+                        onChange={setThankYouPagePassives}
+                        modules={quillModules}
+                        formats={quillFormats}
+                        theme="snow"
+                        className="bg-white"
+                        placeholder="Enter thank you content for passives (scores 7-8)..."
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      This content will be shown to customers who give a score of 7 or 8 (passives).
+                      Consider asking for specific improvement suggestions.
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Detractors (0-6) Thank You Page */}
+              <div className="border rounded-lg p-4 bg-red-50">
+                <button 
+                  type="button"
+                  onClick={() => toggleThankYouPageSection('detractors')}
+                  className="flex justify-between items-center w-full text-left"
+                >
+                  <div className="font-medium text-red-700">Detractors (Scores 0-6)</div>
+                  {expandedThankYouPages.detractors ? 
+                    <ChevronUp className="w-5 h-5 text-red-700" /> : 
+                    <ChevronDown className="w-5 h-5 text-red-700" />}
+                </button>
+                
+                {expandedThankYouPages.detractors && (
+                  <div className="mt-4">
+                    <div className="mt-1">
+                      <ReactQuill
+                        value={thankYouPageDetractors}
+                        onChange={setThankYouPageDetractors}
+                        modules={quillModules}
+                        formats={quillFormats}
+                        theme="snow"
+                        className="bg-white"
+                        placeholder="Enter thank you content for detractors (scores 0-6)..."
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      This content will be shown to customers who give a score of 0 to 6 (detractors).
+                      Consider providing support resources or contact information.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Feedback Settings */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium">General Feedback Settings</h3>
@@ -288,7 +445,7 @@ export default function CampaignForm({ onSubmit, initialData, companyName = 'us'
             <span>Allow text feedback</span>
           </label>
           
-          {/* New Gamification toggle */}
+          {/* Gamification toggle */}
           {settings.allowVoice && (
             <div className="pt-2 border-t mt-2">
               <label className="flex items-center space-x-2">

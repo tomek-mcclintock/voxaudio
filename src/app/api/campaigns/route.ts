@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const campaignData = await request.json();
     console.log('Server received campaign data:', campaignData);
 
-    // Create new campaign
+    // Create new campaign with added fields for custom thank you pages
     const { data: campaign, error: createError } = await supabase
     .from('feedback_campaigns')
     .insert([
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         end_date: campaignData.end_date || null,
         include_nps: campaignData.include_nps ?? true,
         nps_question: campaignData.nps_question || null,
-        additionalFeedbackText: campaignData.additionalFeedbackText || null, // Add the new field here
+        additionalFeedbackText: campaignData.additionalFeedbackText || null,
         include_additional_questions: campaignData.include_additional_questions ?? false,
         questions: campaignData.include_additional_questions ? campaignData.questions : [],
         settings: campaignData.settings || {
@@ -45,7 +45,12 @@ export async function POST(request: NextRequest) {
         },
         language: campaignData.language || 'en',
         introText: campaignData.introText || null,
-        active: true
+        active: true,
+        // Added fields for custom thank you pages
+        useCustomThankYouPages: campaignData.useCustomThankYouPages || false,
+        thankYouPagePromoters: campaignData.thankYouPagePromoters || null,
+        thankYouPagePassives: campaignData.thankYouPagePassives || null,
+        thankYouPageDetractors: campaignData.thankYouPageDetractors || null
       }
     ])
     .select()

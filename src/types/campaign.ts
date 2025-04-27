@@ -1,4 +1,4 @@
-// src/types/campaign.ts - Updated with gamification setting
+// src/types/campaign.ts
 export type QuestionType = 'nps' | 'text' | 'rating' | 'multiple_choice' | 'yes_no' | 'voice_text';
 
 interface Scale {
@@ -39,5 +39,10 @@ export interface Campaign {
   created_at: string;
   language?: string;
   introText?: string;
-  additionalFeedbackText?: string; // New field for customizable additional feedback text
+  additionalFeedbackText?: string;
+  // New fields for custom thank you pages
+  thankYouPagePromoters?: string;  // For scores 9-10
+  thankYouPagePassives?: string;   // For scores 7-8
+  thankYouPageDetractors?: string; // For scores 0-6
+  useCustomThankYouPages?: boolean; // Toggle for using custom thank you pages
 }

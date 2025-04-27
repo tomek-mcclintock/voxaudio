@@ -325,15 +325,40 @@ export default function FeedbackForm({
     }
   };
 
+  // Helper function to determine which thank you content to show based on NPS score
+  const getThankYouContent = () => {
+    // If custom thank you pages are enabled and we have an NPS score
+    if (campaignData?.useCustomThankYouPages && npsScore !== null) {
+      if (npsScore >= 9) {
+        // Promoter (9-10)
+        return campaignData.thankYouPagePromoters || t('form.thankYouText');
+      } else if (npsScore >= 7) {
+        // Passive (7-8)
+        return campaignData.thankYouPagePassives || t('form.thankYouText');
+      } else {
+        // Detractor (0-6)
+        return campaignData.thankYouPageDetractors || t('form.thankYouText');
+      }
+    }
+    
+    // Default thank you message
+    return t('form.thankYouText');
+  };
+
   if (submitted) {
+    const thankYouContent = getThankYouContent();
+    
     return (
       <div className="text-center p-8">
         <h2 className="font-lora text-2xl text-gray-800 mb-4">
           {t('form.thankYouTitle')}
         </h2>
-        <p className="font-manrope text-gray-600">
-          {t('form.thankYouText')}
-        </p>
+        
+        {/* Render thank you content with HTML support */}
+        <div 
+          className="font-manrope text-gray-600 rich-text-content"
+          dangerouslySetInnerHTML={{ __html: thankYouContent }}
+        />
       </div>
     );
   }
