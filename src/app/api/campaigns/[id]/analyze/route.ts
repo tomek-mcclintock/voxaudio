@@ -139,7 +139,7 @@ export async function POST(
     
     // Return the results
     return NextResponse.json({
-      topics,
+      topics: topics, // Make sure this is at the top level
       feedbackCount: feedbackEntries.length,
       stats: {
         sentiment: sentimentCounts,
@@ -147,6 +147,7 @@ export async function POST(
       },
       processingTime: totalTime
     });
+    
   } catch (error: any) {
     console.error('Error in feedback analysis:', error);
     
