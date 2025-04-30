@@ -596,7 +596,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
                                   </div>
                                 );
                               } else {
-                                return 'No voice feedback';
+                                return '-';
                               }
                             })()}
                           </td>
