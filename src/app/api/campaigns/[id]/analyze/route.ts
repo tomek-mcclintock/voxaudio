@@ -129,8 +129,8 @@ export async function POST(
     const sentimentCounts = {
       positive: feedbackEntries.filter(entry => entry.sentiment === 'positive').length,
       negative: feedbackEntries.filter(entry => entry.sentiment === 'negative').length,
-      neutral: feedbackEntries.filter(entry => entry.sentiment === 'neutral').length
-    };
+      neutral: feedbackEntries.filter(entry => entry.sentiment === 'neutral/mixed').length
+    };  
     
     const npsStats = calculateNpsStats(feedbackEntries);
     
