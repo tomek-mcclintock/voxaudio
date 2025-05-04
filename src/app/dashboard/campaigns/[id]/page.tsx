@@ -510,7 +510,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
               </div>
             </div>
           )}
-
+          
           {/* Sentiment Analysis - Only show if campaign includes NPS */}
           {campaign.include_nps && stats && (stats.positiveCount > 0 || stats.negativeCount > 0 || stats.neutralCount > 0) && (
             <div className="bg-white rounded-lg shadow p-6 mb-8">
@@ -521,7 +521,7 @@ export default function CampaignDetails({ params }: { params: { id: string } }) 
                   <div className="text-3xl font-bold text-green-600">{stats.positiveCount}</div>
                 </div>
                 <div className="flex-1 bg-gray-50 p-4 rounded-lg">
-                  <div className="text-gray-700 font-semibold mb-2">Neutral</div>
+                  <div className="text-gray-700 font-semibold mb-2">Neutral/Mixed</div>
                   <div className="text-3xl font-bold text-gray-600">{stats.neutralCount}</div>
                 </div>
                 <div className="flex-1 bg-red-50 p-4 rounded-lg">

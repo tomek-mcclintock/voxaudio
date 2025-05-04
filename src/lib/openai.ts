@@ -77,42 +77,55 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
   }
 }
 
+// src/lib/openai.ts - Simplified version
 export async function analyzeFeedback(text: string): Promise<{
   sentiment: string;
-  summary: string;
-  themes: string[];
 }> {
   try {
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      throw new Error('Invalid text input for sentiment analysis');
+    }
+
+    const trimmedText = text.trim();
+    
+    const systemPrompt = `You are analyzing customer feedback sentiment. Return only the sentiment: 'positive', 'negative', or 'neutral/mixed'.
+    
+    Rules:
+    - Choose 'positive' if the customer expresses satisfaction, happiness, or praise
+    - Choose 'negative' if the customer expresses dissatisfaction, frustration, or complaint
+    - Choose 'neutral/mixed' for any combination of the above OR purely factual statements
+    
+    Return ONLY one phrase: positive, negative, or neutral/mixed`;
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are analyzing customer feedback. Based solely on the text provided, determine if the sentiment is 'positive', 'negative', or 'neutral'. Be decisive - if there's any clear emotional direction, choose positive or negative. Only use 'neutral' when truly ambiguous. Format your response as JSON with 'sentiment', 'summary', and 'themes' fields."
+          content: systemPrompt
         },
         {
           role: "user",
-          content: text
+          content: trimmedText
         }
-      ]
+      ],
+      temperature: 0,
+      max_tokens: 15 // Slightly more tokens for "neutral/mixed"
     });
 
-    // Parse the response from the text format
-    const content = response.choices[0].message.content;
-    if (!content) {
-      throw new Error('No content in response');
+    const content = response.choices[0].message.content?.trim().toLowerCase();
+    
+    // Validate response
+    const validSentiments = ['positive', 'negative', 'neutral/mixed'];
+    if (content && validSentiments.includes(content)) {
+      return { sentiment: content };
+    } else {
+      console.warn(`Invalid sentiment response: "${content}". Defaulting to neutral/mixed.`);
+      return { sentiment: 'neutral/mixed' };
     }
     
-    const result = JSON.parse(content);
-    console.log('Sentiment analysis result:', result);
-    return result;
   } catch (error) {
     console.error('Error in sentiment analysis:', error);
-    // Default to neutral if parsing fails
-    return {
-      sentiment: 'neutral',
-      summary: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
-      themes: []
-    };
+    return { sentiment: 'neutral/mixed' };
   }
 }

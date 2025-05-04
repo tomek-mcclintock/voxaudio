@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
         ),
         question_responses (
           question_id,
-          response_value
+          response_value,
+          voice_file_url
         )
       `)
       .eq('company_id', companyId)

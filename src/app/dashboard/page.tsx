@@ -6,7 +6,9 @@ import { useCompany } from '@/lib/contexts/CompanyContext';
 
 interface FeedbackEntry {
   campaign_id: string;
-  voice_file_url: string | null;
+  question_responses: Array<{
+    voice_file_url: string | null;
+  }> | null;
   feedback_campaigns: {
     name: string;
   };
@@ -16,6 +18,7 @@ interface CampaignSummary {
   id: string;
   name: string;
   responseCount: number;
+  voiceResponseCount: number;
 }
 
 interface DashboardData {
@@ -57,7 +60,18 @@ export default function DashboardPage() {
       
       result.recentFeedback.forEach((feedback: FeedbackEntry) => {
         totalResponses++;
-        if (feedback.voice_file_url) {
+        
+        // Count voice responses properly
+        let hasVoiceResponse = false;
+        if (feedback.question_responses && feedback.question_responses.length > 0) {
+          feedback.question_responses.forEach(response => {
+            if (response.voice_file_url && response.voice_file_url !== null) {
+              hasVoiceResponse = true;
+            }
+          });
+        }
+        
+        if (hasVoiceResponse) {
           voiceRecordings++;
         }
         
@@ -67,10 +81,14 @@ export default function DashboardPage() {
           campaignData[campaignId] = {
             id: campaignId,
             name: feedback.feedback_campaigns.name,
-            responseCount: 0
+            responseCount: 0,
+            voiceResponseCount: 0
           };
         }
         campaignData[campaignId].responseCount++;
+        if (hasVoiceResponse) {
+          campaignData[campaignId].voiceResponseCount++;
+        }
       });
       
       setData({
@@ -133,6 +151,7 @@ export default function DashboardPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responses</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voice Responses</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -145,6 +164,9 @@ export default function DashboardPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {campaign.responseCount}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {campaign.voiceResponseCount || 0}
                   </td>
                 </tr>
               ))}

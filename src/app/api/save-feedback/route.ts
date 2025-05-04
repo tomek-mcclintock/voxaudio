@@ -127,16 +127,24 @@ export async function POST(request: NextRequest) {
     }
     
     // Analyze sentiment if we have text feedback
-    if (feedbackText) {
+    if (feedbackText && feedbackText.trim().length > 0) {
       try {
         console.log('Analyzing text feedback...');
-        const analysis = await analyzeFeedback(feedbackText);
+        const trimmedText = feedbackText.trim();
+        const analysis = await analyzeFeedback(trimmedText);
         sentiment = analysis.sentiment;
         console.log('Analysis complete:', sentiment);
       } catch (error) {
         console.error('Error analyzing text:', error);
+        // Ensure we have a fallback sentiment
+        sentiment = 'neutral/mixed';
+        console.log('Using fallback sentiment:', sentiment);
       }
+    } else {
+      console.log('No text feedback to analyze');
+      sentiment = null; // Explicitly set to null if no text
     }
+
     
     // Convert empty string OrderID to null to ensure it's properly handled by the database
     const orderIdToSave = orderId && orderId.trim() !== '' ? orderId : null;
