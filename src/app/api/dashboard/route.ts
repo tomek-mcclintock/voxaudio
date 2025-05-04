@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(1000)
       .lte('created_at', now.toISOString());
 
     if (feedbackError) {
