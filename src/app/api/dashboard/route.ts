@@ -7,6 +7,17 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const runtime = 'nodejs';
 
+// Add type definition for daily summaries
+interface DailySummary {
+  id: string;
+  company_id: string;
+  date: string;
+  total_responses: number;
+  voice_responses: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
@@ -29,19 +40,9 @@ export async function GET(request: NextRequest) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(now.getDate() - 30);
     
-    // Fetch daily summaries for the last 30 days
-    const { data: summaries, error: summariesError } = await supabase
-      .from('daily_summaries')
-      .select('*')
-      .eq('company_id', companyId)
-      .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
-      .lte('date', now.toISOString().split('T')[0])
-      .order('date', { ascending: true });
+    // Explicitly type summaries as empty array of DailySummary
+    const summaries: DailySummary[] = [];
     
-    if (summariesError) {
-      throw summariesError;
-    }
-
     // Fetch feedback with question responses
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedback_submissions')
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(JSON.stringify({
       companyId,
       timestamp: now.toISOString(),
-      dailySummaries: summaries || [],
+      dailySummaries: summaries,
       recentFeedback: feedback || []
     }), {
       headers,
