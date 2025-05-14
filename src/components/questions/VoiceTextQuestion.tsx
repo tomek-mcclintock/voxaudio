@@ -79,8 +79,23 @@ export default function VoiceTextQuestion({
 
   return (
     <div className="space-y-4">
-    {showTabs && (
-  <div className="flex justify-center space-x-2 mt-6 mb-2">
+{showTabs && (
+  <div className="flex justify-center space-x-2 mt-6 mb-4">
+    {question.allowVoice && (
+      <button
+        type="button"
+        onClick={() => setResponseType('voice')}
+        className={`px-6 py-3 rounded-lg text-sm flex items-center gap-2 transition-all transform hover:scale-105 
+          ${responseType === 'voice' ? 
+            'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg ring-2 ring-green-500 ring-offset-2' : 
+            'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+      >
+        <Mic className="w-5 h-5" />
+        <span className="font-semibold">
+          {responseType === 'voice' ? '🎯 Voice Selected' : '🎙️ Use Voice (Recommended)'}
+        </span>
+      </button>
+    )}
     {question.allowText && (
       <button
         type="button"
@@ -94,21 +109,17 @@ export default function VoiceTextQuestion({
         {t('form.textResponse')}
       </button>
     )}
-    {question.allowVoice && (
-      <button
-        type="button"
-        onClick={() => setResponseType('voice')}
-        className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors 
-          ${responseType === 'voice' ? 
-            'bg-gray-700 text-white' : 
-            'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-      >
-        <Mic className="w-4 h-4" />
-        {t('form.voiceResponse')}
-      </button>
-    )}
   </div>
 )}
+
+{question.allowVoice && (
+  <div className="text-center mb-4">
+    <p className="text-sm text-gray-600">
+      <span className="font-semibold text-green-600">73% of customers</span> prefer leaving voice feedback
+    </p>
+  </div>
+)}
+
 
       {responseType === 'text' && question.allowText && (
         <textarea
