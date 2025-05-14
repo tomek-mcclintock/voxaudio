@@ -44,7 +44,9 @@ export const translations = {
       progressInitial: "The best feedback is >45s",
       progressSegment1: "Great start, you're on a roll!",
       progressSegment2: "Keep going, you're getting close!",
-      progressSegment3: "Perfect length achieved! Feel free to add any final thoughts."
+      progressSegment3: "Perfect length achieved! Feel free to add any final thoughts.",
+      useVoiceRecommended: "Use Voice (Recommended)",
+      voiceSelected: "Voice Selected"
     }
   },
   de: {
@@ -91,7 +93,9 @@ export const translations = {
       progressInitial: "Am besten >45 Sekunden sprechen",
       progressSegment1: "Guter Start, weiter so!",
       progressSegment2: "Fast geschafft!",
-      progressSegment3: "Perfekt! Gerne noch mehr hinzufügen."
+      progressSegment3: "Perfekt! Gerne noch mehr hinzufügen.",
+      useVoiceRecommended: "Sprachaufnahme nutzen (Empfohlen)",
+      voiceSelected: "Sprache ausgewählt"
     }
   }
 };
