@@ -113,15 +113,6 @@ export default function VoiceTextQuestion({
   </div>
 )}
 
-{question.allowVoice && (
-  <div className="text-center mb-4">
-    <p className="text-sm text-gray-600">
-      The Ruggable Team loves voice feedback and uses your thoughts to improve
-    </p>
-  </div>
-)}
-
-
       {responseType === 'text' && question.allowText && (
         <textarea
           value={textValue}
