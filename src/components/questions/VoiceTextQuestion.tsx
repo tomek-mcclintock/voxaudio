@@ -5,6 +5,7 @@ import { useState, useRef } from 'react';
 import { Mic, MessageSquare, Square, Play, Pause, Trash2 } from 'lucide-react';
 import AudioRecorder, { AudioRecorderRef } from '../AudioRecorder';
 import { translate } from '@/lib/translations';
+import { useCompany } from '@/lib/contexts/CompanyContext';
 
 interface VoiceTextQuestionProps {
   question: any;
@@ -33,6 +34,8 @@ export default function VoiceTextQuestion({
   const [isPlaying, setIsPlaying] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
+  const company = useCompany();
+  
 
   // Helper function for translations
   const t = (key: string, replacements: Record<string, string> = {}) => {
@@ -92,7 +95,7 @@ export default function VoiceTextQuestion({
       >
         <Mic className="w-5 h-5" />
         <span className="font-semibold">
-          {responseType === 'voice' ? '🎯 Voice Selected' : '🎙️ Use Voice (Recommended)'}
+          {responseType === 'voice' ? 'Voice Selected' : 'Use Voice (Recommended)'}
         </span>
       </button>
     )}
@@ -115,7 +118,7 @@ export default function VoiceTextQuestion({
 {question.allowVoice && (
   <div className="text-center mb-4">
     <p className="text-sm text-gray-600">
-      <span className="font-semibold text-green-600">73% of customers</span> prefer leaving voice feedback
+      The {company.name} Team loves voice feedback and uses your thoughts to improve
     </p>
   </div>
 )}
