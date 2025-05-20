@@ -241,18 +241,23 @@ export async function POST(
     });
     const endTime = Date.now();
 
-    const summary = response.choices[0].message.content || 'Unable to generate summary.';
-    log(`OpenAI response received in ${endTime - startTime}ms`, {
-      summaryLength: summary.length,
-      summary: summary
-    });
+    let summary = response.choices[0].message.content || 'Unable to generate summary.';
 
-    // Save summary to database
-    log('Saving summary to database');
-    const { error: updateError } = await supabase
-      .from('feedback_campaigns')
-      .update({ summary: summary })
-      .eq('id', campaignId);
+// Simple way to remove backticks from the beginning and end
+summary = summary.replace(/^```(?:html)?/, '').replace(/```$/, '').trim();
+
+log(`OpenAI response received in ${endTime - startTime}ms`, {
+  summaryLength: summary.length,
+  summary: summary
+});
+
+// Save summary to database
+log('Saving summary to database');
+const { error: updateError } = await supabase
+  .from('feedback_campaigns')
+  .update({ summary: summary })
+  .eq('id', campaignId);
+
       
     if (updateError) {
       log('Error saving summary', updateError);
