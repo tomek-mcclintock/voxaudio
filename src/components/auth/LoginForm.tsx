@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useSearchParams } from 'next/navigation';
 import { Github } from 'lucide-react';
 
 export default function LoginForm() {
@@ -10,13 +11,24 @@ export default function LoginForm() {
     password: ''
   });
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const supabase = createClientComponentClient();
+  const searchParams = useSearchParams();
+
+  // Check for messages from registration
+  useEffect(() => {
+    const messageParam = searchParams.get('message');
+    if (messageParam) {
+      setMessage(messageParam);
+    }
+  }, [searchParams]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setMessage('');
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -26,7 +38,7 @@ export default function LoginForm() {
 
       if (error) throw error;
 
-      window.location.href = '/dashboard';
+      window.location.href = '/dashboard/campaigns';
     } catch (err) {
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -55,6 +67,12 @@ export default function LoginForm() {
     <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Login</h2>
       
+      {message && (
+        <div className="mb-4 text-green-600 text-sm bg-green-50 border border-green-200 rounded-md p-3">
+          {message}
+        </div>
+      )}
+      
       <button
         onClick={handleGoogleLogin}
         className="w-full bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg 
@@ -81,7 +99,7 @@ export default function LoginForm() {
           <input
             type="email"
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={credentials.email}
             onChange={(e) => setCredentials({
               ...credentials,
@@ -97,7 +115,7 @@ export default function LoginForm() {
           <input
             type="password"
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={credentials.password}
             onChange={(e) => setCredentials({
               ...credentials,
@@ -107,17 +125,26 @@ export default function LoginForm() {
         </div>
 
         {error && (
-          <div className="text-red-600 text-sm">{error}</div>
+          <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-md p-3">
+            {error}
+          </div>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
         >
           {loading ? 'Logging in...' : 'Login with Email'}
         </button>
       </form>
+
+      <div className="mt-4 text-center">
+        <span className="text-sm text-gray-600">Don't have an account? </span>
+        <a href="/register" className="text-sm text-blue-600 hover:underline">
+          Register here
+        </a>
+      </div>
     </div>
   );
 }
