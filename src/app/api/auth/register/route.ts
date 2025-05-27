@@ -1,8 +1,14 @@
 // src/app/api/auth/register/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+// Create a service role client that bypasses RLS
+const serviceRoleClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,9 +16,9 @@ export async function POST(request: NextRequest) {
     const { companyName, email, password, domain } = await request.json();
     console.log('Received registration data for:', email);
 
-    // Create company first
+    // Create company first using service role client (bypasses RLS)
     console.log('Step 1: Creating company record...');
-    const { data: company, error: companyError } = await supabase
+    const { data: company, error: companyError } = await serviceRoleClient
       .from('companies')
       .insert([{
         name: companyName,
@@ -30,23 +36,22 @@ export async function POST(request: NextRequest) {
     }
     console.log('Company created successfully:', company.id);
 
-    // Then create auth user
+    // Then create auth user using service role client
     console.log('Step 2: Creating auth user...');
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          company_id: company.id,
-          company_name: companyName
-        }
+      email_confirm: true,
+      user_metadata: {
+        company_id: company.id,
+        company_name: companyName
       }
     });
 
     if (authError) {
       console.error('Auth creation failed:', authError);
       // Rollback company creation
-      await supabase.from('companies').delete().eq('id', company.id);
+      await serviceRoleClient.from('companies').delete().eq('id', company.id);
       return NextResponse.json(
         { error: 'Failed to create user account: ' + authError.message },
         { status: 500 }
@@ -54,11 +59,12 @@ export async function POST(request: NextRequest) {
     }
     console.log('Auth user created successfully');
 
-    // Finally create user profile
+    // Finally create user profile using service role client
     console.log('Step 3: Creating user profile...');
-    const { error: userError } = await supabase
+    const { error: userError } = await serviceRoleClient
       .from('users')
       .insert([{
+        id: authData.user.id,
         company_id: company.id,
         email: email,
         role: 'admin'
@@ -67,7 +73,8 @@ export async function POST(request: NextRequest) {
     if (userError) {
       console.error('User profile creation failed:', userError);
       // Rollback previous creations
-      await supabase.from('companies').delete().eq('id', company.id);
+      await serviceRoleClient.auth.admin.deleteUser(authData.user.id);
+      await serviceRoleClient.from('companies').delete().eq('id', company.id);
       return NextResponse.json(
         { error: 'Failed to create user profile: ' + userError.message },
         { status: 500 }
