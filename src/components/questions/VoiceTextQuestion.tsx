@@ -75,55 +75,9 @@ export default function VoiceTextQuestion({
     onVoiceRecording(null);
   };
 
-  // Only show tabs if both voice and text are allowed
-  const showTabs = question.allowVoice && question.allowText;
-
   return (
     <div className="space-y-4">
-{showTabs && (
-  <div className="flex justify-center space-x-2 mt-6 mb-4">
-{question.allowVoice && (
-  <button
-    type="button"
-    onClick={() => setResponseType('voice')}
-    className={`px-6 py-3 rounded-lg text-sm flex items-center gap-2 transition-all transform hover:scale-105 
-      ${responseType === 'voice' ? 
-        'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg ring-2 ring-green-500 ring-offset-2' : 
-        'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-  >
-    <Mic className="w-5 h-5" />
-    <span className="font-semibold">
-      {responseType === 'voice' 
-        ? `${t('form.voiceSelected')}` 
-        : `${t('form.useVoiceRecommended')}`}
-    </span>
-  </button>
-)}
-    {question.allowText && (
-      <button
-        type="button"
-        onClick={() => setResponseType('text')}
-        className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors 
-          ${responseType === 'text' ? 
-            'bg-gray-700 text-white' : 
-            'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-      >
-        <MessageSquare className="w-4 h-4" />
-        {t('form.textResponse')}
-      </button>
-    )}
-  </div>
-)}
-
-      {responseType === 'text' && question.allowText && (
-        <textarea
-          value={textValue}
-          onChange={(e) => onTextChange(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-24 focus:outline-none"
-          placeholder={t('form.typeAnswerHere')}
-        />
-      )}
-
+      {/* Voice Feedback Section - Default */}
       {responseType === 'voice' && question.allowVoice && (
         <div className="border border-gray-200 rounded-lg p-4">
           {!audioBlob ? (
@@ -162,6 +116,44 @@ export default function VoiceTextQuestion({
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Text Feedback Section */}
+      {responseType === 'text' && question.allowText && (
+        <textarea
+          value={textValue}
+          onChange={(e) => onTextChange(e.target.value)}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-24 focus:outline-none"
+          placeholder={t('form.typeAnswerHere')}
+        />
+      )}
+
+      {/* Switch to Text Option - Only show when in voice mode and text is allowed */}
+      {responseType === 'voice' && question.allowText && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setResponseType('text')}
+            className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
+            style={{ color: companyColor || '#657567' }}
+          >
+            <MessageSquare className="w-4 h-4" />
+            {t('form.switchToTextInstead')}
+          </button>
+        </div>
+      )}
+
+      {/* Switch to Voice Option - Only show when in text mode and voice is allowed */}
+      {responseType === 'text' && question.allowVoice && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setResponseType('voice')}
+            className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
+            style={{ color: companyColor || '#657567' }}
+          >
+            <Mic className="w-4 h-4" />
+            {t('form.switchToVoiceInstead')}
+          </button>
         </div>
       )}
     </div>

@@ -566,16 +566,6 @@ export default function FeedbackForm({
           )}
 
           {/* Text Feedback Section */}
-          {feedbackMode === 'text' && campaignData.settings.allowText && (
-            <textarea
-              value={textFeedback}
-              onChange={(e) => setTextFeedback(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-24 focus:outline-none"
-              placeholder={t('form.typeAnswerHere')}
-            />
-          )}
-
-          {/* Switch to Text Option - Only show when in voice mode and text is allowed */}
           {feedbackMode === 'voice' && campaignData.settings.allowText && (
             <div className="flex justify-center">
               <button
@@ -584,7 +574,21 @@ export default function FeedbackForm({
                 style={{ color: companyData?.primary_color || '#657567' }}
               >
                 <MessageSquare className="w-4 h-4" />
-                {t('form.textResponse')}
+                {t('form.switchToTextInstead')}
+              </button>
+            </div>
+          )}
+
+          {/* Switch to Voice Option - Only show when in text mode and voice is allowed */}
+          {feedbackMode === 'text' && campaignData.settings.allowVoice && (
+            <div className="flex justify-center">
+              <button
+                onClick={() => setFeedbackMode('voice')}
+                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
+                style={{ color: companyData?.primary_color || '#657567' }}
+              >
+                <Mic className="w-4 h-4" />
+                {t('form.switchToVoiceInstead')}
               </button>
             </div>
           )}
