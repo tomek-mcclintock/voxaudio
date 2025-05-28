@@ -146,6 +146,7 @@ export default function FeedbackForm({
   const [consent, setConsent] = useState(false);
   const audioRecorderRef = useRef<AudioRecorderRef>(null);
   const [localOrderId] = useState(orderId); // No setState function, making it read-only
+  const [feedbackMode, setFeedbackMode] = useState<'voice' | 'text'>('voice'); // Default to voice feedback
 
   // Check if gamification is enabled in campaign settings
   const isGamificationEnabled = campaignData?.settings?.enableGamification !== undefined ? 
@@ -551,23 +552,56 @@ export default function FeedbackForm({
             )}
           </p>
           
-          {/* New VoiceTextQuestion component for NPS feedback */}
-          <VoiceTextQuestion
-            question={{
-              id: 'nps_score',
-              type: 'voice_text',
-              text: campaignData.additionalFeedbackText || t('form.additionalFeedback'),
-              allowVoice: campaignData.settings.allowVoice,
-              allowText: campaignData.settings.allowText,
-              required: false
-            }}
-            textValue={textFeedback}
-            onTextChange={setTextFeedback}
-            onVoiceRecording={setAudioBlob}
-            companyColor={companyData?.primary_color || '#657567'}
-            language={language}
-            enableGamification={isGamificationEnabled}
-          />
+          {/* Voice Feedback Section - Default */}
+          {feedbackMode === 'voice' && campaignData.settings.allowVoice && (
+            <div className="border border-gray-200 rounded-lg p-4">
+              <AudioRecorder
+                onRecordingComplete={setAudioBlob}
+                ref={audioRecorderRef}
+                companyColor={companyData?.primary_color || '#657567'}
+                language={language}
+                enableGamification={isGamificationEnabled}
+              />
+            </div>
+          )}
+
+          {/* Text Feedback Section */}
+          {feedbackMode === 'text' && campaignData.settings.allowText && (
+            <textarea
+              value={textFeedback}
+              onChange={(e) => setTextFeedback(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-24 focus:outline-none"
+              placeholder={t('form.typeAnswerHere')}
+            />
+          )}
+
+          {/* Switch to Text Option - Only show when in voice mode and text is allowed */}
+          {feedbackMode === 'voice' && campaignData.settings.allowText && (
+            <div className="flex justify-center">
+              <button
+                onClick={() => setFeedbackMode('text')}
+                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
+                style={{ color: companyData?.primary_color || '#657567' }}
+              >
+                <MessageSquare className="w-4 h-4" />
+                {t('form.textResponse')}
+              </button>
+            </div>
+          )}
+
+          {/* Switch to Voice Option - Only show when in text mode and voice is allowed */}
+          {feedbackMode === 'text' && campaignData.settings.allowVoice && (
+            <div className="flex justify-center">
+              <button
+                onClick={() => setFeedbackMode('voice')}
+                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
+                style={{ color: companyData?.primary_color || '#657567' }}
+              >
+                <Mic className="w-4 h-4" />
+                {t('form.voiceResponse')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
