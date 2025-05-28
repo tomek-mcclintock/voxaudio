@@ -540,74 +540,74 @@ export default function FeedbackForm({
         </div>
       )}
 
-      {/* Voice/Text Feedback Section - Only shown if NPS is included */}
-      {campaignData?.include_nps && (
-        <div className="space-y-4 mb-8">
-          <p className="font-manrope text-gray-700">
-            {/* Use the custom text if available, or fall back to translation */}
-            {campaignData.additionalFeedbackText ? (
-              <div dangerouslySetInnerHTML={{ __html: campaignData.additionalFeedbackText }} />
-            ) : (
-              t('form.additionalFeedback')
-            )}
-          </p>
-          
-          {/* Voice Feedback Section - Default */}
-          {feedbackMode === 'voice' && campaignData.settings.allowVoice && (
-            <div className="border border-gray-200 rounded-lg p-4">
-              <AudioRecorder
-                onRecordingComplete={setAudioBlob}
-                ref={audioRecorderRef}
-                companyColor={companyData?.primary_color || '#657567'}
-                language={language}
-                enableGamification={isGamificationEnabled}
-              />
-            </div>
-          )}
+          {/* Voice/Text Feedback Section - Only shown if NPS is included */}
+          {campaignData?.include_nps && (
+            <div className="space-y-4 mb-8">
+              <p className="font-manrope text-gray-700">
+                {/* Use the custom text if available, or fall back to translation */}
+                {campaignData.additionalFeedbackText ? (
+                  <div dangerouslySetInnerHTML={{ __html: campaignData.additionalFeedbackText }} />
+                ) : (
+                  t('form.additionalFeedback')
+                )}
+              </p>
+              
+              {/* Voice Feedback Section - Default */}
+              {feedbackMode === 'voice' && campaignData.settings.allowVoice && (
+                <>
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <AudioRecorder
+                      onRecordingComplete={setAudioBlob}
+                      ref={audioRecorderRef}
+                      companyColor={companyData?.primary_color || '#657567'}
+                      language={language}
+                      enableGamification={isGamificationEnabled}
+                    />
+                  </div>
+                  
+                  {/* Switch to Text Option - Only show when in voice mode and text is allowed */}
+                  {campaignData.settings.allowText && (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => setFeedbackMode('text')}
+                        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
+                        style={{ color: companyData?.primary_color || '#657567' }}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        {t('form.switchToTextInstead')}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
 
-          {/* Text Feedback Section */}
-          {feedbackMode === 'voice' && campaignData.settings.allowText && (
-            <div className="flex justify-center">
-              <button
-                onClick={() => setFeedbackMode('text')}
-                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
-                style={{ color: companyData?.primary_color || '#657567' }}
-              >
-                <MessageSquare className="w-4 h-4" />
-                {t('form.switchToTextInstead')}
-              </button>
+              {/* Text Feedback Section */}
+              {feedbackMode === 'text' && campaignData.settings.allowText && (
+                <>
+                  <textarea
+                    value={textFeedback}
+                    onChange={(e) => setTextFeedback(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg font-manrope h-24 focus:outline-none"
+                    placeholder={t('form.typeAnswerHere')}
+                  />
+                  
+                  {/* Switch to Voice Option - Only show when in text mode and voice is allowed */}
+                  {campaignData.settings.allowVoice && (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => setFeedbackMode('voice')}
+                        className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
+                        style={{ color: companyData?.primary_color || '#657567' }}
+                      >
+                        <Mic className="w-4 h-4" />
+                        {t('form.switchToVoiceInstead')}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
-
-          {/* Switch to Voice Option - Only show when in text mode and voice is allowed */}
-          {feedbackMode === 'text' && campaignData.settings.allowVoice && (
-            <div className="flex justify-center">
-              <button
-                onClick={() => setFeedbackMode('voice')}
-                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
-                style={{ color: companyData?.primary_color || '#657567' }}
-              >
-                <Mic className="w-4 h-4" />
-                {t('form.switchToVoiceInstead')}
-              </button>
-            </div>
-          )}
-
-          {/* Switch to Voice Option - Only show when in text mode and voice is allowed */}
-          {feedbackMode === 'text' && campaignData.settings.allowVoice && (
-            <div className="flex justify-center">
-              <button
-                onClick={() => setFeedbackMode('voice')}
-                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 transition-colors"
-                style={{ color: companyData?.primary_color || '#657567' }}
-              >
-                <Mic className="w-4 h-4" />
-                {t('form.voiceResponse')}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Consent and Submit */}
       <div className="space-y-4">
