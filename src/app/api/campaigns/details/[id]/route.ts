@@ -41,16 +41,12 @@ export async function GET(
 
     if (userError) throw userError;
 
-    // Get campaign details - make sure to include the new thank you page fields
+    // Get campaign details - UPDATED: Only select fields that actually exist
     const { data: campaign, error: campaignError } = await supabase
       .from('feedback_campaigns')
       .select(`
         *,
-        questions,
-        useCustomThankYouPages,
-        thankYouPagePromoters,
-        thankYouPagePassives,
-        thankYouPageDetractors
+        questions
       `)
       .eq('id', params.id)
       .eq('company_id', userData.company_id)
