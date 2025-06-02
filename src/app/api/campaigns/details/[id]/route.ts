@@ -22,6 +22,15 @@ interface FeedbackSubmission {
   question_responses: QuestionResponse[] | null;
 }
 
+// Helper function to split array into chunks
+function chunkArray<T>(array: T[], chunkSize: number): T[][] {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -68,7 +77,7 @@ export async function GET(
 
     console.log('Campaign fetched successfully:', campaign.name);
 
-    // Get feedback submissions for this campaign
+    // Get feedback submissions for this campaign - LIMIT to most recent 100 for performance
     console.log('Fetching feedback submissions...');
     const { data: submissions, error: submissionsError } = await supabase
       .from('feedback_submissions')
@@ -80,14 +89,15 @@ export async function GET(
       `)
       .eq('campaign_id', params.id)
       .eq('company_id', userData.company_id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100); // LIMIT to 100 most recent submissions
 
     if (submissionsError) {
       console.error('Error fetching submissions:', submissionsError);
       throw submissionsError;
     }
 
-    console.log(`Found ${submissions?.length || 0} submissions`);
+    console.log(`Found ${submissions?.length || 0} submissions (limited to most recent 100)`);
 
     // Get all question responses for all feedback submissions
     if (!submissions || submissions.length === 0) {
@@ -100,111 +110,70 @@ export async function GET(
 
     const submissionIds = submissions.map(sub => sub.id);
     console.log(`Fetching question responses for ${submissionIds.length} submissions...`);
-    console.log('Submission IDs:', submissionIds);
     
-    // Try to fetch question responses with error handling
-    try {
-      const { data: allResponses, error: responsesError } = await supabase
-        .from('question_responses')
-        .select('*')
-        .in('feedback_submission_id', submissionIds);
-
-      if (responsesError) {
-        console.error('Error fetching question responses:', responsesError);
-        console.error('Responses error details:', JSON.stringify(responsesError, null, 2));
-        throw responsesError;
-      }
-
-      console.log(`Found ${allResponses?.length || 0} question responses`);
-
-      // Map responses to their submissions
-      const processedFeedback = submissions.map(submission => {
-        // Find all responses for this submission
-        const responses = allResponses?.filter(
-          response => response.feedback_submission_id === submission.id
-        ) || [];
-
-        // Find NPS score response
-        const npsScoreResponse = responses.find(r => r.question_id === 'nps_score');
-        const npsScore = npsScoreResponse?.response_value 
-          ? parseInt(npsScoreResponse.response_value) 
-          : null;
-        
-        // Use the transcription from the NPS response (if exists)
-        const transcription = npsScoreResponse?.transcription || null;
-
-        return {
-          ...submission,
-          nps_score: npsScore,
-          transcription,
-          question_responses: responses
-        };
-      });
-
-      console.log('Successfully processed all feedback');
-      return NextResponse.json({
-        campaign,
-        feedback: processedFeedback
-      });
-
-    } catch (responsesFetchError) {
-      console.error('Specific error fetching question responses:', responsesFetchError);
+    // Batch the requests into chunks of 50 to avoid hitting database limits
+    const batchSize = 50;
+    const submissionChunks = chunkArray(submissionIds, batchSize);
+    console.log(`Split into ${submissionChunks.length} batches of ${batchSize}`);
+    
+    let allResponses: any[] = [];
+    
+    for (let i = 0; i < submissionChunks.length; i++) {
+      const chunk = submissionChunks[i];
+      console.log(`Processing batch ${i + 1}/${submissionChunks.length} with ${chunk.length} submissions`);
       
-      // Try to fetch responses one by one to identify the problematic submission
-      console.log('Attempting to fetch responses individually...');
-      const allResponses: any[] = [];
-      
-      for (const submissionId of submissionIds) {
-        try {
-          console.log(`Trying to fetch responses for submission: ${submissionId}`);
-          const { data: individualResponses, error: individualError } = await supabase
-            .from('question_responses')
-            .select('*')
-            .eq('feedback_submission_id', submissionId);
-            
-          if (individualError) {
-            console.error(`Error with submission ${submissionId}:`, individualError);
-            continue; // Skip this submission and continue with others
-          }
-          
-          if (individualResponses) {
-            allResponses.push(...individualResponses);
-            console.log(`Successfully fetched ${individualResponses.length} responses for ${submissionId}`);
-          }
-        } catch (individualFetchError) {
-          console.error(`Failed to fetch responses for submission ${submissionId}:`, individualFetchError);
-          continue; // Skip this submission
+      try {
+        const { data: batchResponses, error: batchError } = await supabase
+          .from('question_responses')
+          .select('*')
+          .in('feedback_submission_id', chunk);
+
+        if (batchError) {
+          console.error(`Error fetching batch ${i + 1}:`, batchError);
+          continue; // Skip this batch and continue with others
         }
+
+        if (batchResponses) {
+          allResponses.push(...batchResponses);
+          console.log(`Batch ${i + 1} successful: ${batchResponses.length} responses`);
+        }
+      } catch (batchFetchError) {
+        console.error(`Failed to fetch batch ${i + 1}:`, batchFetchError);
+        continue; // Skip this batch
       }
-      
-      console.log(`Total responses fetched individually: ${allResponses.length}`);
-      
-      // Process with the responses we could fetch
-      const processedFeedback = submissions.map(submission => {
-        const responses = allResponses.filter(
-          response => response.feedback_submission_id === submission.id
-        );
-
-        const npsScoreResponse = responses.find(r => r.question_id === 'nps_score');
-        const npsScore = npsScoreResponse?.response_value 
-          ? parseInt(npsScoreResponse.response_value) 
-          : null;
-        
-        const transcription = npsScoreResponse?.transcription || null;
-
-        return {
-          ...submission,
-          nps_score: npsScore,
-          transcription,
-          question_responses: responses
-        };
-      });
-
-      return NextResponse.json({
-        campaign,
-        feedback: processedFeedback
-      });
     }
+
+    console.log(`Total responses fetched: ${allResponses.length}`);
+
+    // Map responses to their submissions
+    const processedFeedback = submissions.map(submission => {
+      // Find all responses for this submission
+      const responses = allResponses.filter(
+        response => response.feedback_submission_id === submission.id
+      );
+
+      // Find NPS score response
+      const npsScoreResponse = responses.find(r => r.question_id === 'nps_score');
+      const npsScore = npsScoreResponse?.response_value 
+        ? parseInt(npsScoreResponse.response_value) 
+        : null;
+      
+      // Use the transcription from the NPS response (if exists)
+      const transcription = npsScoreResponse?.transcription || null;
+
+      return {
+        ...submission,
+        nps_score: npsScore,
+        transcription,
+        question_responses: responses
+      };
+    });
+
+    console.log('Successfully processed all feedback');
+    return NextResponse.json({
+      campaign,
+      feedback: processedFeedback
+    });
 
   } catch (error) {
     console.error('Error in campaign details API:', error);
