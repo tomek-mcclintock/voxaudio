@@ -90,7 +90,7 @@ export async function GET(
       .eq('campaign_id', params.id)
       .eq('company_id', userData.company_id)
       .order('created_at', { ascending: false })
-      .limit(100); // LIMIT to 100 most recent submissions
+      .limit(500); // LIMIT to 100 most recent submissions
 
     if (submissionsError) {
       console.error('Error fetching submissions:', submissionsError);
